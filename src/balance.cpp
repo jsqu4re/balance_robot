@@ -5,6 +5,13 @@
 #include <navio_vendor/Navio2/PWM.h>
 #include <navio_vendor/Navio2/RCOutput_Navio2.h>
 
+#include <chrono>
+#include <functional>
+#include <string>
+
+#include "rclcpp/rclcpp.hpp"
+#include "sensor_msgs/msg/joy.hpp"
+
 #include <arpa/inet.h>
 #include <memory>
 #include <netinet/in.h>
@@ -156,6 +163,9 @@ void stop_motors_handler(sig_atomic_t s) {
 int main(int argc, char *argv[]) {
   signal(SIGINT, stop_motors_handler);
 
+  // init ros2
+  rclcpp::init(argc, argv);
+
   // Check to be the only user
   if (check_apm()) {
     return EXIT_FAILURE;
@@ -216,7 +226,7 @@ int main(int argc, char *argv[]) {
   pwm->set_duty_cycle(PWM_OUTPUT_WHEEL_LEFT, SERVO_MID);
   pwm->set_duty_cycle(PWM_OUTPUT_WHEEL_RIGHT, SERVO_MID);
 
-  PID pid_v = PID(-5, 5, 0.01, 0.0001, 0);
+  PID pid_v = PID(-3, 3, 0.001, 0.00001, 0);
 
   PID pid_roll = PID(SERVO_MIN - SERVO_MID, SERVO_MAX - SERVO_MID, 10, 100, 0);
 
@@ -238,7 +248,7 @@ int main(int argc, char *argv[]) {
     float increment =
         pid_roll.calculate(setpoint_roll, measurement.roll, measurement.dt);
 
-    setpoint_roll = pid_v.calculate(0, increment, measurement.dt) * -1;
+    setpoint_roll = pid_v.calculate(0, increment, measurement.dt);
 
     float pwm_target = SERVO_MID + increment;
 

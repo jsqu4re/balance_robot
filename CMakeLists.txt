@@ -19,6 +19,7 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(navio_vendor REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(sensor_msgs REQUIRED)
 
 add_library(${PROJECT_NAME} SHARED
   "src/pid.cpp"
@@ -46,17 +47,20 @@ target_include_directories(balance PUBLIC
   "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
   "$<INSTALL_INTERFACE:include>"
   ${rclcpp_INCLUDE_DIRS}
-  ${navio_vendor_INCLUDE_DIRS}  
+  ${navio_vendor_INCLUDE_DIRS}
+  ${sensor_msgs_INCLUDE_DIRS}
 )
 
 target_link_libraries(balance
   ${navio_vendor_LIBRARIES}
   ${rclcpp_LIBRARIES}
+  ${sensor_msgs_LIBRARIES}
 )
 
 ament_target_dependencies(balance
   rclcpp
   navio_vendor
+  sensor_msgs
 )
 
 ament_export_dependencies(rclcpp navio_vendor)
