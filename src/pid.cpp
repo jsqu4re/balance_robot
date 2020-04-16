@@ -70,7 +70,14 @@ float PIDImpl::calculate(float setpoint, float pv, float dt) {
 
   // Integral term
   _integral += error * dt;
+
   float Iout = _Ki * _integral;
+
+  // Do not saturate integral term
+  if (Iout < _min)
+    _integral = _min / _Ki;
+  if (Iout > _max)
+    _integral = _max / _Ki;
 
   // Derivative term
   float derivative = (error - _pre_error) / dt;

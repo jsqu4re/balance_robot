@@ -216,7 +216,7 @@ int main(int argc, char *argv[]) {
   pwm->set_duty_cycle(PWM_OUTPUT_WHEEL_LEFT, SERVO_MID);
   pwm->set_duty_cycle(PWM_OUTPUT_WHEEL_RIGHT, SERVO_MID);
 
-  PID pid_v = PID(-3, 3, 0.0001, 0.01, 0);
+  PID pid_v = PID(-5, 5, 0.01, 0.0001, 0);
 
   PID pid_roll = PID(SERVO_MIN - SERVO_MID, SERVO_MAX - SERVO_MID, 10, 100, 0);
 
@@ -238,7 +238,7 @@ int main(int argc, char *argv[]) {
     float increment =
         pid_roll.calculate(setpoint_roll, measurement.roll, measurement.dt);
 
-    setpoint_roll = pid_v.calculate(0, increment, measurement.dt);
+    setpoint_roll = pid_v.calculate(0, increment, measurement.dt) * -1;
 
     float pwm_target = SERVO_MID + increment;
 
