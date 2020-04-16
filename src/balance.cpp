@@ -25,6 +25,9 @@
 
 #include <balance_robot/pid.h>
 
+static float forward = 0;
+static float turn = 0;
+
 std::unique_ptr<InertialSensor> get_inertial_sensor(std::string sensor_name) {
   if (sensor_name == "mpu") {
     printf("Selected: MPU9250\n");
@@ -145,6 +148,26 @@ roll_dt imuLoop(AHRS *ahrs) {
 
 // using namespace Navio;
 
+using std::placeholders::_1;
+
+class MinimalSubscriber : public rclcpp::Node {
+public:
+  MinimalSubscriber() : Node("minimal_subscriber") {
+    subscription_ = this->create_subscription<sensor_msgs::msg::Joy>(
+        "joy", 10, std::bind(&MinimalSubscriber::topic_callback, this, _1));
+  }
+
+private:
+  void topic_callback(const sensor_msgs::msg::Joy::SharedPtr msg) const {
+    // RCLCPP_INFO(this->get_logger(),
+    //             "I heard: '%+05.2f' '%+05.2f' '%+05.2f' '%+05.2f'",
+    //             msg->axes[0], msg->axes[1], msg->axes[2], msg->axes[3]);
+    forward = msg->axes[1];
+    turn = msg->axes[0];
+  }
+  rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr subscription_;
+};
+
 std::unique_ptr<RCOutput> get_rcout() {
   auto ptr = std::unique_ptr<RCOutput>{new RCOutput_Navio2()};
   return ptr;
@@ -153,18 +176,23 @@ std::unique_ptr<RCOutput> get_rcout() {
 //=============================================================================
 
 void stop_motors_handler(sig_atomic_t s) {
-  printf("Terminating greacfully");
+  printf("Terminating greacfully\n");
   auto pwm = get_rcout();
   pwm->set_duty_cycle(PWM_OUTPUT_WHEEL_LEFT, SERVO_MID);
   pwm->set_duty_cycle(PWM_OUTPUT_WHEEL_RIGHT, SERVO_MID);
+  rclcpp::shutdown();
   exit(0);
 }
+
+void listener() { rclcpp::spin(std::make_shared<MinimalSubscriber>()); }
 
 int main(int argc, char *argv[]) {
   signal(SIGINT, stop_motors_handler);
 
   // init ros2
   rclcpp::init(argc, argv);
+
+  std::thread listener_task(listener);
 
   // Check to be the only user
   if (check_apm()) {
@@ -230,7 +258,7 @@ int main(int argc, char *argv[]) {
 
   PID pid_roll = PID(SERVO_MIN - SERVO_MID, SERVO_MAX - SERVO_MID, 10, 100, 0);
 
-  float setpoint_roll = 0;
+  float setpoint_roll = -1.44;
   float setpoint_v = 0;
   float dtsumm;
 
@@ -248,14 +276,16 @@ int main(int argc, char *argv[]) {
     float increment =
         pid_roll.calculate(setpoint_roll, measurement.roll, measurement.dt);
 
-    setpoint_roll = pid_v.calculate(0, increment, measurement.dt);
+    // setpoint_roll = pid_v.calculate(0, increment, measurement.dt);
+
+    setpoint_roll = (forward * 4) - 1.44;
 
     float pwm_target = SERVO_MID + increment;
 
     dtsumm += measurement.dt;
     if (dtsumm > 0.025) {
-      pwm->set_duty_cycle(PWM_OUTPUT_WHEEL_LEFT, pwm_target);
-      pwm->set_duty_cycle(PWM_OUTPUT_WHEEL_RIGHT, pwm_target);
+      pwm->set_duty_cycle(PWM_OUTPUT_WHEEL_LEFT, pwm_target - (turn * 50));
+      pwm->set_duty_cycle(PWM_OUTPUT_WHEEL_RIGHT, pwm_target + (turn * 50));
       // Console output
       printf(
           "SETPOINT: %+05.2f ROLL: %+05.2f INC: %+05.2f TARGET: %+05.2f PERIOD "
