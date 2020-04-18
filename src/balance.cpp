@@ -322,13 +322,6 @@ int main(int argc, char *argv[]) {
 
       pwm->set_duty_cycle(PWM_OUTPUT_WHEEL_LEFT, pwm_target_left);
       pwm->set_duty_cycle(PWM_OUTPUT_WHEEL_RIGHT, pwm_target_right);
-      // Console output
-      printf(
-          "SETPOINT: %+05.2f ROLL: %+05.2f INC: %+05.2f TARGET: %+05.2f PERIOD "
-          "%.4fs RATE "
-          "%dHz \n",
-          setpoint_roll, measurement.roll, increment, pwm_target,
-          measurement.dt, int(1 / measurement.dt));
 
       auto msg = std::make_unique<balance_robot_msgs::msg::Balance>();
 
