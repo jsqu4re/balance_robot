@@ -25,6 +25,8 @@
 
 #include <balance_robot/pid.h>
 
+#include <balance_robot_msgs/msg/balance.hpp>
+
 static float forward = 0;
 static float turn = 0;
 
@@ -159,9 +161,6 @@ public:
 
 private:
   void topic_callback(const sensor_msgs::msg::Joy::SharedPtr msg) const {
-    // RCLCPP_INFO(this->get_logger(),
-    //             "I heard: '%+05.2f' '%+05.2f' '%+05.2f' '%+05.2f'",
-    //             msg->axes[0], msg->axes[1], msg->axes[2], msg->axes[3]);
     forward = msg->axes[1];
     turn = msg->axes[0];
   }
@@ -191,8 +190,16 @@ int main(int argc, char *argv[]) {
 
   // init ros2
   rclcpp::init(argc, argv);
+  auto node = rclcpp::Node::make_shared("Balance");
+
+  node->declare_parameter("pid_roll.p");
+  node->declare_parameter("pid_roll.i");
+  node->declare_parameter("pid_roll.d");
 
   std::thread listener_task(listener);
+  rclcpp::QoS qos(rclcpp::KeepLast(10));
+  auto balance_pub = node->create_publisher<balance_robot_msgs::msg::Balance>(
+      "balance/control", qos);
 
   // Check to be the only user
   if (check_apm()) {
@@ -254,9 +261,10 @@ int main(int argc, char *argv[]) {
   pwm->set_duty_cycle(PWM_OUTPUT_WHEEL_LEFT, SERVO_MID);
   pwm->set_duty_cycle(PWM_OUTPUT_WHEEL_RIGHT, SERVO_MID);
 
-  PID pid_v = PID(-3, 3, 0.001, 0.00001, 0);
+  PID pid_v = PID(-3, 3, 0.0001, 0.0001, 0);
 
-  PID pid_roll = PID(SERVO_MIN - SERVO_MID, SERVO_MAX - SERVO_MID, 10, 100, 0);
+  PID pid_roll =
+      PID(SERVO_MIN - SERVO_MID, SERVO_MAX - SERVO_MID, 11, 80, 0.01);
 
   float setpoint_roll = -1.44;
   float setpoint_v = 0;
@@ -276,16 +284,44 @@ int main(int argc, char *argv[]) {
     float increment =
         pid_roll.calculate(setpoint_roll, measurement.roll, measurement.dt);
 
-    // setpoint_roll = pid_v.calculate(0, increment, measurement.dt);
+    setpoint_roll = pid_v.calculate(0, increment, measurement.dt);
 
-    setpoint_roll = (forward * 4) - 1.44;
+    setpoint_roll += (forward * 10) - 1.44;
 
     float pwm_target = SERVO_MID + increment;
 
     dtsumm += measurement.dt;
     if (dtsumm > 0.025) {
-      pwm->set_duty_cycle(PWM_OUTPUT_WHEEL_LEFT, pwm_target - (turn * 50));
-      pwm->set_duty_cycle(PWM_OUTPUT_WHEEL_RIGHT, pwm_target + (turn * 50));
+      // Add turning
+      float pwm_target_left = pwm_target + (turn * 70);
+      float pwm_target_right = pwm_target - (turn * 70);
+
+      if (pwm_target_left > SERVO_MAX) {
+        float diff = pwm_target_left - SERVO_MAX;
+        pwm_target_left = SERVO_MAX;
+        pwm_target_right -= diff;
+      }
+
+      if (pwm_target_left < SERVO_MIN) {
+        float diff = SERVO_MIN - pwm_target_left;
+        pwm_target_left = SERVO_MIN;
+        pwm_target_right += diff;
+      }
+
+      if (pwm_target_right > SERVO_MAX) {
+        float diff = pwm_target_right - SERVO_MAX;
+        pwm_target_right = SERVO_MAX;
+        pwm_target_left -= diff;
+      }
+
+      if (pwm_target_right < SERVO_MIN) {
+        float diff = SERVO_MIN - pwm_target_right;
+        pwm_target_right = SERVO_MIN;
+        pwm_target_left += diff;
+      }
+
+      pwm->set_duty_cycle(PWM_OUTPUT_WHEEL_LEFT, pwm_target_left);
+      pwm->set_duty_cycle(PWM_OUTPUT_WHEEL_RIGHT, pwm_target_right);
       // Console output
       printf(
           "SETPOINT: %+05.2f ROLL: %+05.2f INC: %+05.2f TARGET: %+05.2f PERIOD "
@@ -293,20 +329,19 @@ int main(int argc, char *argv[]) {
           "%dHz \n",
           setpoint_roll, measurement.roll, increment, pwm_target,
           measurement.dt, int(1 / measurement.dt));
+
+      auto msg = std::make_unique<balance_robot_msgs::msg::Balance>();
+
+      msg->setpoint = setpoint_roll;
+      msg->roll = measurement.roll;
+      msg->increment = increment;
+      msg->target_pwm = pwm_target;
+      msg->target_pwm_left = pwm_target_left;
+      msg->target_pwm_right = pwm_target_right;
+
+      balance_pub->publish(std::move(msg));
+
       dtsumm = 0;
     }
   }
 }
-
-// #include "rclcpp/rclcpp.hpp"
-
-// int main(int argc, char *argv[]) {
-//   rclcpp::init(argc, argv);
-//   auto node = rclcpp::Node::make_shared("ObiWan");
-
-//   RCLCPP_INFO(node->get_logger(),
-//               "Help me Obi-Wan Kenobi, you're my only hope");
-
-//   rclcpp::shutdown();
-//   return 0;
-// }
