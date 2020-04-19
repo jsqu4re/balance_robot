@@ -37,6 +37,8 @@
 struct vel_cmd {
   float forward;
   float turn;
+  float forward_gain;
+  float turn_gain;
 };
 
 struct pid_param {
@@ -47,10 +49,10 @@ struct pid_param {
 
 static float main_loop = 0.02;
 
-static vel_cmd velocity_cmd {0, 0};
+static vel_cmd velocity_cmd {0, 0, 10000, 70};
 
+static pid_param pid_param_v {0.001, 0.0001, 0};
 static pid_param pid_param_roll {14.5, 44, 0.016};
-static pid_param pid_param_v {0.0001, 0.0001, 0};
 
 std::unique_ptr<InertialSensor> get_inertial_sensor(std::string sensor_name) {
   if (sensor_name == "mpu") {
@@ -200,6 +202,9 @@ void param_change_callback(const rcl_interfaces::msg::ParameterEvent::SharedPtr 
     if(parameter.name == "pid_v.i") pid_param_v.i = parameter.value.double_value;
     if(parameter.name == "pid_v.d") pid_param_v.d = parameter.value.double_value;
 
+    if(parameter.name == "vel_cmd.forward_gain") velocity_cmd.forward_gain = parameter.value.double_value;
+    if(parameter.name == "vel_cmd.turn_gain") velocity_cmd.turn_gain = parameter.value.double_value;
+
     if(parameter.name == "main_loop") main_loop = parameter.value.double_value;
   }
   printf("Updated PID: P %+05.2f I %+05.2f D %+05.2f\n", pid_param_roll.p, pid_param_roll.i, pid_param_roll.d);
@@ -219,6 +224,9 @@ int main(int argc, char *argv[]) {
   node->declare_parameter("pid_velocity.p");
   node->declare_parameter("pid_velocity.i");
   node->declare_parameter("pid_velocity.d");
+
+  node->declare_parameter("vel_cmd.forward_gain");
+  node->declare_parameter("vel_cmd.turn_gain");
 
   node->declare_parameter("main_loop");
 
@@ -324,17 +332,16 @@ int main(int argc, char *argv[]) {
     roll = measurement.roll;
 
     if (dtsumm > main_loop) {
-      setpoint_velocity = velocity_cmd.forward * 100;
+      setpoint_velocity = velocity_cmd.forward * velocity_cmd.forward_gain;
 
       setpoint_roll = pid_v.calculate(setpoint_velocity, increment, dtsumm);
-
       increment = pid_roll.calculate(setpoint_roll, roll, dtsumm);
 
       float pwm_target = SERVO_MID + increment;
 
       // Add turning
-      float pwm_target_left = pwm_target + (velocity_cmd.turn * 70);
-      float pwm_target_right = pwm_target - (velocity_cmd.turn * 70);
+      float pwm_target_left = pwm_target + (velocity_cmd.turn * velocity_cmd.turn_gain);
+      float pwm_target_right = pwm_target - (velocity_cmd.turn * velocity_cmd.turn_gain);
 
       if (pwm_target_left > SERVO_MAX) {
         float diff = pwm_target_left - SERVO_MAX;
