@@ -45,10 +45,9 @@ struct pid_param {
   float d;
 };
 
-static float forward = 0;
-static float turn = 0;
+static float main_loop = 0.02;
 
-static float main_loop = 0.2;
+static vel_cmd velocity_cmd {0, 0};
 
 static pid_param pid_param_roll {14.5, 44, 0.016};
 static pid_param pid_param_v {0.0001, 0.0001, 0};
@@ -187,8 +186,8 @@ void stop_motors_handler(sig_atomic_t s) {
 // void listener() { rclcpp::spin(std::make_shared<MinimalSubscriber>()); }
 
 void joy_topic_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
-  forward = msg->axes[1];
-  turn = msg->axes[0];
+  velocity_cmd.forward = msg->axes[1];
+  velocity_cmd.turn = msg->axes[0];
 }
 
 void param_change_callback(const rcl_interfaces::msg::ParameterEvent::SharedPtr event) {
@@ -315,25 +314,27 @@ int main(int argc, char *argv[]) {
     printf("ready! %+05.2f\n", measurement.roll);
   }
 
+  rclcpp::Clock ros_clock(RCL_ROS_TIME);
+
   while (rclcpp::ok()) {
     roll_dt measurement = imuLoop(ahrs.get());
 
     dtsumm += measurement.dt;
     roll = measurement.roll;
 
-    if (dtsumm > 0.025) {
+    if (dtsumm > main_loop) {
       float increment =
           pid_roll.calculate(setpoint_roll, roll, dtsumm);
 
       setpoint_roll = pid_v.calculate(0, increment, measurement.dt);
 
-      setpoint_roll = (forward * 10) - 1.44;
+      setpoint_roll = (velocity_cmd.forward * 10) - 1.44;
 
       float pwm_target = SERVO_MID + increment;
 
       // Add turning
-      float pwm_target_left = pwm_target + (turn * 70);
-      float pwm_target_right = pwm_target - (turn * 70);
+      float pwm_target_left = pwm_target + (velocity_cmd.turn * 70);
+      float pwm_target_right = pwm_target - (velocity_cmd.turn * 70);
 
       if (pwm_target_left > SERVO_MAX) {
         float diff = pwm_target_left - SERVO_MAX;
@@ -364,9 +365,17 @@ int main(int argc, char *argv[]) {
 
       auto msg = std::make_unique<balance_robot_msgs::msg::Balance>();
 
-      msg->setpoint = setpoint_roll;
-      msg->roll = roll;
-      msg->increment = increment;
+      msg->header.frame_id = "robot";
+      msg->header.stamp = ros_clock.now();
+
+      msg->roll.setpoint = setpoint_roll;
+      msg->roll.measurement = roll;
+      msg->roll.increment = increment;
+
+      msg->velocity.setpoint = 0;
+      msg->velocity.measurement = increment;
+      msg->velocity.increment = setpoint_roll;
+
       msg->target_pwm = pwm_target;
       msg->target_pwm_left = pwm_target_left;
       msg->target_pwm_right = pwm_target_right;
@@ -378,6 +387,7 @@ int main(int argc, char *argv[]) {
       rclcpp::spin_some(node);
 
       pid_roll.set(pid_param_roll.p, pid_param_roll.i, pid_param_roll.d);
+      pid_v.set(pid_param_v.p, pid_param_v.i, pid_param_v.d);
     }
   }
 }
