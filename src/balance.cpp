@@ -48,7 +48,10 @@ struct pid_param {
 static float forward = 0;
 static float turn = 0;
 
-static pid_param pid_param_roll {11, 80, 0.01};
+static float main_loop = 0.2;
+
+static pid_param pid_param_roll {14.5, 44, 0.016};
+static pid_param pid_param_v {0.0001, 0.0001, 0};
 
 std::unique_ptr<InertialSensor> get_inertial_sensor(std::string sensor_name) {
   if (sensor_name == "mpu") {
@@ -193,6 +196,12 @@ void param_change_callback(const rcl_interfaces::msg::ParameterEvent::SharedPtr 
     if(parameter.name == "pid_roll.p") pid_param_roll.p = parameter.value.double_value;
     if(parameter.name == "pid_roll.i") pid_param_roll.i = parameter.value.double_value;
     if(parameter.name == "pid_roll.d") pid_param_roll.d = parameter.value.double_value;
+
+    if(parameter.name == "pid_v.p") pid_param_v.p = parameter.value.double_value;
+    if(parameter.name == "pid_v.i") pid_param_v.i = parameter.value.double_value;
+    if(parameter.name == "pid_v.d") pid_param_v.d = parameter.value.double_value;
+
+    if(parameter.name == "main_loop") main_loop = parameter.value.double_value;
   }
   printf("Updated PID: P %+05.2f I %+05.2f D %+05.2f\n", pid_param_roll.p, pid_param_roll.i, pid_param_roll.d);
 }
@@ -207,6 +216,12 @@ int main(int argc, char *argv[]) {
   node->declare_parameter("pid_roll.p");
   node->declare_parameter("pid_roll.i");
   node->declare_parameter("pid_roll.d");
+
+  node->declare_parameter("pid_velocity.p");
+  node->declare_parameter("pid_velocity.i");
+  node->declare_parameter("pid_velocity.d");
+
+  node->declare_parameter("main_loop");
 
   // std::thread listener_task(listener);
   rclcpp::QoS qos(rclcpp::KeepLast(10));
@@ -280,10 +295,10 @@ int main(int argc, char *argv[]) {
   pwm->set_duty_cycle(PWM_OUTPUT_WHEEL_LEFT, SERVO_MID);
   pwm->set_duty_cycle(PWM_OUTPUT_WHEEL_RIGHT, SERVO_MID);
 
-  PID pid_v = PID(-3, 3, 0.0001, 0.0001, 0);
+  PID pid_v = PID(-10, 10, 0.0001, 0.0001, 0);
 
   PID pid_roll =
-      PID(SERVO_MIN - SERVO_MID, SERVO_MAX - SERVO_MID, 11, 80, 0.01);
+      PID(SERVO_MIN - SERVO_MID, SERVO_MAX - SERVO_MID, 15, 50, 0.016);
 
   float setpoint_roll = -1.44;
   float setpoint_v = 0;
@@ -310,7 +325,7 @@ int main(int argc, char *argv[]) {
       float increment =
           pid_roll.calculate(setpoint_roll, roll, dtsumm);
 
-      // setpoint_roll = pid_v.calculate(0, increment, measurement.dt);
+      setpoint_roll = pid_v.calculate(0, increment, measurement.dt);
 
       setpoint_roll = (forward * 10) - 1.44;
 
