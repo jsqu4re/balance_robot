@@ -27,8 +27,28 @@
 
 #include <balance_robot_msgs/msg/balance.hpp>
 
+#define SERVO_MIN 1280 /*mS*/
+#define SERVO_MID 1500 /*mS*/
+#define SERVO_MAX 1720 /*mS*/
+
+#define PWM_OUTPUT_WHEEL_LEFT 1
+#define PWM_OUTPUT_WHEEL_RIGHT 2
+
+struct vel_cmd {
+  float forward;
+  float turn;
+};
+
+struct pid_param {
+  float p;
+  float i;
+  float d;
+};
+
 static float forward = 0;
 static float turn = 0;
+
+static pid_param pid_param_roll {11, 80, 0.01};
 
 std::unique_ptr<InertialSensor> get_inertial_sensor(std::string sensor_name) {
   if (sensor_name == "mpu") {
@@ -141,31 +161,9 @@ roll_dt imuLoop(AHRS *ahrs) {
   return roll_dt{roll, dt};
 }
 
-#define SERVO_MIN 1280 /*mS*/
-#define SERVO_MID 1500 /*mS*/
-#define SERVO_MAX 1720 /*mS*/
-
-#define PWM_OUTPUT_WHEEL_LEFT 1
-#define PWM_OUTPUT_WHEEL_RIGHT 2
-
 // using namespace Navio;
 
 using std::placeholders::_1;
-
-class MinimalSubscriber : public rclcpp::Node {
-public:
-  MinimalSubscriber() : Node("minimal_subscriber") {
-    subscription_ = this->create_subscription<sensor_msgs::msg::Joy>(
-        "joy", 10, std::bind(&MinimalSubscriber::topic_callback, this, _1));
-  }
-
-private:
-  void topic_callback(const sensor_msgs::msg::Joy::SharedPtr msg) const {
-    forward = msg->axes[1];
-    turn = msg->axes[0];
-  }
-  rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr subscription_;
-};
 
 std::unique_ptr<RCOutput> get_rcout() {
   auto ptr = std::unique_ptr<RCOutput>{new RCOutput_Navio2()};
@@ -183,23 +181,44 @@ void stop_motors_handler(sig_atomic_t s) {
   exit(0);
 }
 
-void listener() { rclcpp::spin(std::make_shared<MinimalSubscriber>()); }
+// void listener() { rclcpp::spin(std::make_shared<MinimalSubscriber>()); }
+
+void joy_topic_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
+  forward = msg->axes[1];
+  turn = msg->axes[0];
+}
+
+void param_change_callback(const rcl_interfaces::msg::ParameterEvent::SharedPtr event) {
+  for (auto parameter : event->changed_parameters) {
+    if(parameter.name == "pid_roll.p") pid_param_roll.p = parameter.value.double_value;
+    if(parameter.name == "pid_roll.i") pid_param_roll.i = parameter.value.double_value;
+    if(parameter.name == "pid_roll.d") pid_param_roll.d = parameter.value.double_value;
+  }
+  printf("Updated PID: P %+05.2f I %+05.2f D %+05.2f\n", pid_param_roll.p, pid_param_roll.i, pid_param_roll.d);
+}
 
 int main(int argc, char *argv[]) {
   signal(SIGINT, stop_motors_handler);
 
   // init ros2
   rclcpp::init(argc, argv);
-  auto node = rclcpp::Node::make_shared("Balance");
+  auto node = rclcpp::Node::make_shared("balance");
 
   node->declare_parameter("pid_roll.p");
   node->declare_parameter("pid_roll.i");
   node->declare_parameter("pid_roll.d");
 
-  std::thread listener_task(listener);
+  // std::thread listener_task(listener);
   rclcpp::QoS qos(rclcpp::KeepLast(10));
   auto balance_pub = node->create_publisher<balance_robot_msgs::msg::Balance>(
       "balance/control", qos);
+
+  auto joy_subscription = node->create_subscription<sensor_msgs::msg::Joy>(
+      "joy", 10, joy_topic_callback);
+
+  auto parameters_client = std::make_shared<rclcpp::AsyncParametersClient>(node);
+
+  auto callback_handler = parameters_client->on_parameter_event(param_change_callback);
 
   // Check to be the only user
   if (check_apm()) {
@@ -268,30 +287,35 @@ int main(int argc, char *argv[]) {
 
   float setpoint_roll = -1.44;
   float setpoint_v = 0;
-  float dtsumm;
+  float dtsumm = 0;
+  float roll = 0;
 
   {
     printf("Waiting...\n");
     roll_dt measurement{100, 0};
     while (measurement.roll > 3 || measurement.roll < -3) {
       measurement = imuLoop(ahrs.get());
+      rclcpp::spin_some(node);
     }
     printf("ready! %+05.2f\n", measurement.roll);
   }
 
-  while (true) {
+  while (rclcpp::ok()) {
     roll_dt measurement = imuLoop(ahrs.get());
-    float increment =
-        pid_roll.calculate(setpoint_roll, measurement.roll, measurement.dt);
-
-    setpoint_roll = pid_v.calculate(0, increment, measurement.dt);
-
-    setpoint_roll += (forward * 10) - 1.44;
-
-    float pwm_target = SERVO_MID + increment;
 
     dtsumm += measurement.dt;
+    roll = measurement.roll;
+
     if (dtsumm > 0.025) {
+      float increment =
+          pid_roll.calculate(setpoint_roll, roll, dtsumm);
+
+      // setpoint_roll = pid_v.calculate(0, increment, measurement.dt);
+
+      setpoint_roll = (forward * 10) - 1.44;
+
+      float pwm_target = SERVO_MID + increment;
+
       // Add turning
       float pwm_target_left = pwm_target + (turn * 70);
       float pwm_target_right = pwm_target - (turn * 70);
@@ -326,7 +350,7 @@ int main(int argc, char *argv[]) {
       auto msg = std::make_unique<balance_robot_msgs::msg::Balance>();
 
       msg->setpoint = setpoint_roll;
-      msg->roll = measurement.roll;
+      msg->roll = roll;
       msg->increment = increment;
       msg->target_pwm = pwm_target;
       msg->target_pwm_left = pwm_target_left;
@@ -335,6 +359,10 @@ int main(int argc, char *argv[]) {
       balance_pub->publish(std::move(msg));
 
       dtsumm = 0;
+
+      rclcpp::spin_some(node);
+
+      pid_roll.set(pid_param_roll.p, pid_param_roll.i, pid_param_roll.d);
     }
   }
 }

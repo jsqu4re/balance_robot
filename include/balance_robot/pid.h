@@ -35,6 +35,9 @@ public:
 
   // Returns the manipulated variable given a setpoint and current process value
   float calculate(float setpoint, float pv, float dt);
+
+  void set(float Kp, float Ki, float Kd);
+
   ~PID();
 
 private:
