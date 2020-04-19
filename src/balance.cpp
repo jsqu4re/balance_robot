@@ -300,9 +300,10 @@ int main(int argc, char *argv[]) {
       PID(SERVO_MIN - SERVO_MID, SERVO_MAX - SERVO_MID, 15, 50, 0.016);
 
   float setpoint_roll = -1.44;
-  float setpoint_v = 0;
+  float setpoint_velocity = 0;
   float dtsumm = 0;
   float roll = 0;
+  float increment = 0;
 
   {
     printf("Waiting...\n");
@@ -323,12 +324,11 @@ int main(int argc, char *argv[]) {
     roll = measurement.roll;
 
     if (dtsumm > main_loop) {
-      float increment =
-          pid_roll.calculate(setpoint_roll, roll, dtsumm);
+      setpoint_velocity = velocity_cmd.forward * 100;
 
-      setpoint_roll = pid_v.calculate(0, increment, measurement.dt);
+      setpoint_roll = pid_v.calculate(setpoint_velocity, increment, dtsumm);
 
-      setpoint_roll = (velocity_cmd.forward * 10) - 1.44;
+      increment = pid_roll.calculate(setpoint_roll, roll, dtsumm);
 
       float pwm_target = SERVO_MID + increment;
 
@@ -368,13 +368,13 @@ int main(int argc, char *argv[]) {
       msg->header.frame_id = "robot";
       msg->header.stamp = ros_clock.now();
 
+      msg->velocity.setpoint = setpoint_velocity;
+      msg->velocity.measurement = increment;
+      msg->velocity.increment = setpoint_roll;
+
       msg->roll.setpoint = setpoint_roll;
       msg->roll.measurement = roll;
       msg->roll.increment = increment;
-
-      msg->velocity.setpoint = 0;
-      msg->velocity.measurement = increment;
-      msg->velocity.increment = setpoint_roll;
 
       msg->target_pwm = pwm_target;
       msg->target_pwm_left = pwm_target_left;
