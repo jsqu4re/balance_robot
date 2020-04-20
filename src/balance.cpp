@@ -302,7 +302,7 @@ int main(int argc, char *argv[]) {
   pwm->set_duty_cycle(PWM_OUTPUT_WHEEL_LEFT, SERVO_MID);
   pwm->set_duty_cycle(PWM_OUTPUT_WHEEL_RIGHT, SERVO_MID);
 
-  PID pid_v = PID(-10, 10, 0.0001, 0.0001, 0);
+  PID pid_v = PID(-20, 20, 0.0001, 0.0001, 0);
 
   PID pid_roll =
       PID(SERVO_MIN - SERVO_MID, SERVO_MAX - SERVO_MID, 15, 50, 0.016);
@@ -312,6 +312,7 @@ int main(int argc, char *argv[]) {
   float dtsumm = 0;
   float roll = 0;
   float increment = 0;
+  float increment_lowpass = 0;
 
   {
     printf("Waiting...\n");
@@ -333,8 +334,8 @@ int main(int argc, char *argv[]) {
 
     if (dtsumm > main_loop) {
       setpoint_velocity = velocity_cmd.forward * velocity_cmd.forward_gain;
-
-      setpoint_roll = pid_v.calculate(setpoint_velocity, increment, dtsumm);
+      increment_lowpass = (increment_lowpass + increment) / 2;
+      setpoint_roll = pid_v.calculate(setpoint_velocity, increment_lowpass, dtsumm);
       increment = pid_roll.calculate(setpoint_roll, roll, dtsumm);
 
       float pwm_target = SERVO_MID + increment;
@@ -376,7 +377,7 @@ int main(int argc, char *argv[]) {
       msg->header.stamp = ros_clock.now();
 
       msg->velocity.setpoint = setpoint_velocity;
-      msg->velocity.measurement = increment;
+      msg->velocity.measurement = increment_lowpass;
       msg->velocity.increment = setpoint_roll;
 
       msg->roll.setpoint = setpoint_roll;
