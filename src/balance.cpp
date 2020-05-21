@@ -49,10 +49,10 @@ struct pid_param {
 
 static float main_loop = 0.02;
 
-static vel_cmd velocity_cmd {0, 0, 10000, 70};
+static vel_cmd velocity_cmd{0, 0, 10000, 70};
 
-static pid_param pid_param_v {0.001, 0.0001, 0};
-static pid_param pid_param_roll {14.5, 44, 0.016};
+static pid_param pid_param_v{0.001, 0.0001, 0};
+static pid_param pid_param_roll{14.5, 44, 0.016};
 
 std::unique_ptr<InertialSensor> get_inertial_sensor(std::string sensor_name) {
   if (sensor_name == "mpu") {
@@ -192,22 +192,33 @@ void joy_topic_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
   velocity_cmd.turn = msg->axes[0];
 }
 
-void param_change_callback(const rcl_interfaces::msg::ParameterEvent::SharedPtr event) {
+void param_change_callback(
+    const rcl_interfaces::msg::ParameterEvent::SharedPtr event) {
   for (auto parameter : event->changed_parameters) {
-    if(parameter.name == "pid_roll.p") pid_param_roll.p = parameter.value.double_value;
-    if(parameter.name == "pid_roll.i") pid_param_roll.i = parameter.value.double_value;
-    if(parameter.name == "pid_roll.d") pid_param_roll.d = parameter.value.double_value;
+    if (parameter.name == "pid_roll.p")
+      pid_param_roll.p = parameter.value.double_value;
+    if (parameter.name == "pid_roll.i")
+      pid_param_roll.i = parameter.value.double_value;
+    if (parameter.name == "pid_roll.d")
+      pid_param_roll.d = parameter.value.double_value;
 
-    if(parameter.name == "pid_v.p") pid_param_v.p = parameter.value.double_value;
-    if(parameter.name == "pid_v.i") pid_param_v.i = parameter.value.double_value;
-    if(parameter.name == "pid_v.d") pid_param_v.d = parameter.value.double_value;
+    if (parameter.name == "pid_v.p")
+      pid_param_v.p = parameter.value.double_value;
+    if (parameter.name == "pid_v.i")
+      pid_param_v.i = parameter.value.double_value;
+    if (parameter.name == "pid_v.d")
+      pid_param_v.d = parameter.value.double_value;
 
-    if(parameter.name == "vel_cmd.forward_gain") velocity_cmd.forward_gain = parameter.value.double_value;
-    if(parameter.name == "vel_cmd.turn_gain") velocity_cmd.turn_gain = parameter.value.double_value;
+    if (parameter.name == "vel_cmd.forward_gain")
+      velocity_cmd.forward_gain = parameter.value.double_value;
+    if (parameter.name == "vel_cmd.turn_gain")
+      velocity_cmd.turn_gain = parameter.value.double_value;
 
-    if(parameter.name == "main_loop") main_loop = parameter.value.double_value;
+    if (parameter.name == "main_loop")
+      main_loop = parameter.value.double_value;
   }
-  printf("Updated PID: P %+05.2f I %+05.2f D %+05.2f\n", pid_param_roll.p, pid_param_roll.i, pid_param_roll.d);
+  printf("Updated PID: P %+05.2f I %+05.2f D %+05.2f\n", pid_param_roll.p,
+         pid_param_roll.i, pid_param_roll.d);
 }
 
 int main(int argc, char *argv[]) {
@@ -217,18 +228,18 @@ int main(int argc, char *argv[]) {
   rclcpp::init(argc, argv);
   auto node = rclcpp::Node::make_shared("balance");
 
-  node->declare_parameter("pid_roll.p");
-  node->declare_parameter("pid_roll.i");
-  node->declare_parameter("pid_roll.d");
+  node->declare_parameter("pid_roll.p", pid_param_roll.p);
+  node->declare_parameter("pid_roll.i", pid_param_roll.i);
+  node->declare_parameter("pid_roll.d", pid_param_roll.d);
 
-  node->declare_parameter("pid_velocity.p");
-  node->declare_parameter("pid_velocity.i");
-  node->declare_parameter("pid_velocity.d");
+  node->declare_parameter("pid_velocity.p", pid_param_v.p);
+  node->declare_parameter("pid_velocity.i", pid_param_v.i);
+  node->declare_parameter("pid_velocity.d", pid_param_v.d);
 
-  node->declare_parameter("vel_cmd.forward_gain");
-  node->declare_parameter("vel_cmd.turn_gain");
+  node->declare_parameter("vel_cmd.forward_gain", velocity_cmd.forward_gain);
+  node->declare_parameter("vel_cmd.turn_gain", velocity_cmd.turn_gain);
 
-  node->declare_parameter("main_loop");
+  node->declare_parameter("main_loop", main_loop);
 
   // std::thread listener_task(listener);
   rclcpp::QoS qos(rclcpp::KeepLast(10));
@@ -238,9 +249,11 @@ int main(int argc, char *argv[]) {
   auto joy_subscription = node->create_subscription<sensor_msgs::msg::Joy>(
       "joy", 10, joy_topic_callback);
 
-  auto parameters_client = std::make_shared<rclcpp::AsyncParametersClient>(node);
+  auto parameters_client =
+      std::make_shared<rclcpp::AsyncParametersClient>(node);
 
-  auto callback_handler = parameters_client->on_parameter_event(param_change_callback);
+  auto callback_handler =
+      parameters_client->on_parameter_event(param_change_callback);
 
   // Check to be the only user
   if (check_apm()) {
@@ -335,14 +348,17 @@ int main(int argc, char *argv[]) {
     if (dtsumm > main_loop) {
       setpoint_velocity = velocity_cmd.forward * velocity_cmd.forward_gain;
       increment_lowpass = (increment_lowpass + increment) / 2;
-      setpoint_roll = pid_v.calculate(setpoint_velocity, increment_lowpass, dtsumm);
+      setpoint_roll =
+          pid_v.calculate(setpoint_velocity, increment_lowpass, dtsumm);
       increment = pid_roll.calculate(setpoint_roll, roll, dtsumm);
 
       float pwm_target = SERVO_MID + increment;
 
       // Add turning
-      float pwm_target_left = pwm_target + (velocity_cmd.turn * velocity_cmd.turn_gain);
-      float pwm_target_right = pwm_target - (velocity_cmd.turn * velocity_cmd.turn_gain);
+      float pwm_target_left =
+          pwm_target + (velocity_cmd.turn * velocity_cmd.turn_gain);
+      float pwm_target_right =
+          pwm_target - (velocity_cmd.turn * velocity_cmd.turn_gain);
 
       if (pwm_target_left > SERVO_MAX) {
         float diff = pwm_target_left - SERVO_MAX;
