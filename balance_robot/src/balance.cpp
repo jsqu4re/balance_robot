@@ -320,7 +320,7 @@ int main(int argc, char *argv[]) {
   PID pid_roll =
       PID(SERVO_MIN - SERVO_MID, SERVO_MAX - SERVO_MID, 15, 50, 0.016);
 
-  float setpoint_roll = -1.44;
+  float setpoint_roll = 0.2;
   float setpoint_velocity = 0;
   float dtsumm = 0;
   float roll = 0;
@@ -347,9 +347,10 @@ int main(int argc, char *argv[]) {
 
     if (dtsumm > main_loop) {
       setpoint_velocity = velocity_cmd.forward * velocity_cmd.forward_gain;
+      setpoint_roll = velocity_cmd.forward * velocity_cmd.forward_gain / 1000 + 0.2;
       increment_lowpass = (increment_lowpass + increment) / 2;
-      setpoint_roll =
-          pid_v.calculate(setpoint_velocity, increment_lowpass, dtsumm);
+      // setpoint_roll =
+      //    pid_v.calculate(setpoint_velocity, increment_lowpass, dtsumm);
       increment = pid_roll.calculate(setpoint_roll, roll, dtsumm);
 
       float pwm_target = SERVO_MID + increment;
