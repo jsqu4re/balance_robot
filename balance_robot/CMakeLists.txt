@@ -45,18 +45,18 @@ add_executable(balance
 )
 
 target_include_directories(balance PUBLIC
-"$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
-"$<INSTALL_INTERFACE:include>"
-${rclcpp_INCLUDE_DIRS}
-${navio_vendor_INCLUDE_DIRS}
-${sensor_msgs_INCLUDE_DIRS}
+  "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+  "$<INSTALL_INTERFACE:include>"
+  ${rclcpp_INCLUDE_DIRS}
+  ${navio_vendor_INCLUDE_DIRS}
+  ${sensor_msgs_INCLUDE_DIRS}
 )
 
 ament_target_dependencies(balance
-rclcpp
-navio_vendor
-sensor_msgs
-balance_robot_msgs
+  rclcpp
+  navio_vendor
+  sensor_msgs
+  balance_robot_msgs
 )
 
 add_executable(orientation
@@ -70,12 +70,33 @@ ament_target_dependencies(orientation
   balance_robot_msgs
 )
 
+add_executable(controller
+  src/balance_controller.cpp
+  src/pid.cpp
+)
+
+ament_target_dependencies(controller
+  rclcpp
+  navio_vendor
+  sensor_msgs
+  balance_robot_msgs
+)
+
+target_include_directories(controller PUBLIC
+  "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+  "$<INSTALL_INTERFACE:include>"
+  ${rclcpp_INCLUDE_DIRS}
+  ${navio_vendor_INCLUDE_DIRS}
+  ${sensor_msgs_INCLUDE_DIRS}
+)
+
 ament_export_dependencies(rclcpp navio_vendor)
 # ament_export_interfaces(export_balance HAS_LIBRARY_TARGET)
 
 install(TARGETS
   balance
   orientation
+  controller
   DESTINATION lib/${PROJECT_NAME}
 )
 
