@@ -31,7 +31,7 @@ class OdriveMotorManager(Node):
 
     def init_odrive(self):
         find_timeout = 10
-        self.get_logger().info("try find an odrive .. timeout=" + find_timeout)
+        self.get_logger().info("try find an odrive .. timeout is " + find_timeout)
         try:
             self.balance_odrive = odrive.find_any(timeout=find_timeout)
         except KeyboardInterrupt:
@@ -41,7 +41,8 @@ class OdriveMotorManager(Node):
             time.sleep(find_timeout)
 
     def timer_callback(self):
-        self.get_logger().info('target_state: %i' % self.target_state)
+        if self.current_state != self.target_state:
+            self.get_logger().info('current_state: ' + str(self.current_state) + ' -> target_state: ' + str(self.target_state))
 
         if self.current_state == State.Init and self.target_state >= State.Ready:
             try:
