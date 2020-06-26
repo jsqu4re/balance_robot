@@ -21,7 +21,6 @@
 
 #include <balance_robot/pid.h>
 
-
 struct vel_cmd {
   float forward;
   float turn;
@@ -53,27 +52,27 @@ static float main_loop = 0.02;
 
 static vel_cmd velocity_cmd{0, 0, 10000, 70};
 
-static orientation orientation_measurement{0,0,0,0.2};
-static encoders encoders_measurement{0,0,0,0};
+static orientation orientation_measurement{.0, .0, .0, 0.2};
+static encoders encoders_measurement{.0, .0, .0, .0};
 
-static pid_param pid_param_v{1, 0, 0};
-static pid_param pid_param_roll{1, 0, 0};
+static pid_param pid_param_v{0.01, 0.0, 0.0};
+static pid_param pid_param_roll{1.0, 0.0, 0.0};
 
 void joy_topic_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
   velocity_cmd.forward = msg->axes[1];
   velocity_cmd.turn = msg->axes[0];
 }
 
-void orientation_topic_callback(const balance_robot_msgs::msg::Orientation::SharedPtr msg) {
-  printf("orientation measurements\n");
+void orientation_topic_callback(
+    const balance_robot_msgs::msg::Orientation::SharedPtr msg) {
   orientation_measurement.roll = msg->roll;
   orientation_measurement.pitch = msg->pitch;
   orientation_measurement.yaw = msg->yaw;
   orientation_measurement.dt = msg->dt;
 }
 
-void encoders_topic_callback(const balance_robot_msgs::msg::Encoders::SharedPtr msg) {
-  printf("encoder measurements\n");
+void encoders_topic_callback(
+    const balance_robot_msgs::msg::Encoders::SharedPtr msg) {
   encoders_measurement.position_left = msg->encoder1.position;
   encoders_measurement.position_right = msg->encoder0.position;
   encoders_measurement.velocity_left = msg->encoder1.velocity;
@@ -105,7 +104,10 @@ void param_change_callback(
     if (parameter.name == "main_loop")
       main_loop = parameter.value.double_value;
   }
-  printf("updated parameters\n");
+  printf("Updated PID_roll: P %+05.2f I %+05.2f D %+05.2f PID_velocity: P "
+         "%+05.2f I %+05.2f D %+05.2f\n",
+         pid_param_roll.p, pid_param_roll.i, pid_param_roll.d, pid_param_v.p,
+         pid_param_v.i, pid_param_v.d);
 }
 
 int main(int argc, char *argv[]) {
@@ -138,11 +140,13 @@ int main(int argc, char *argv[]) {
   auto joy_subscription = node->create_subscription<sensor_msgs::msg::Joy>(
       "joy", 10, joy_topic_callback);
 
-  auto orientation_subscription = node->create_subscription<balance_robot_msgs::msg::Orientation>(
-      "balance/orientation", 10, orientation_topic_callback);
+  auto orientation_subscription =
+      node->create_subscription<balance_robot_msgs::msg::Orientation>(
+          "balance/orientation", 10, orientation_topic_callback);
 
-  auto encoders_subscription = node->create_subscription<balance_robot_msgs::msg::Encoders>(
-      "balance/encoders", 10, encoders_topic_callback);
+  auto encoders_subscription =
+      node->create_subscription<balance_robot_msgs::msg::Encoders>(
+          "balance/encoders", 10, encoders_topic_callback);
 
   auto parameters_client =
       std::make_shared<rclcpp::AsyncParametersClient>(node);
@@ -152,7 +156,7 @@ int main(int argc, char *argv[]) {
 
   // FIXME: PID values need to be proper
   PID pid_v = PID(-20, 20, 0.05, 0, 0);
-  PID pid_roll = PID(-500,500, 1, 0, 0);
+  PID pid_roll = PID(-500, 500, 1, 0, 0);
 
   float setpoint_roll = 0;
   float setpoint_velocity = 0;
@@ -166,10 +170,13 @@ int main(int argc, char *argv[]) {
     dtsum = orientation_measurement.dt;
     roll = orientation_measurement.roll;
     setpoint_velocity = velocity_cmd.forward * velocity_cmd.forward_gain;
-    float measured_velocity = (encoders_measurement.velocity_left + encoders_measurement.velocity_right) / 2;
+    float measured_velocity = (encoders_measurement.velocity_left +
+                               encoders_measurement.velocity_right) /
+                              2;
 
     // pid controllers
-    setpoint_roll = pid_v.calculate(setpoint_velocity, measured_velocity, dtsum);
+    setpoint_roll =
+        pid_v.calculate(setpoint_velocity, measured_velocity, dtsum);
     motor_increment = pid_roll.calculate(setpoint_roll, roll, dtsum);
 
     float pwm_target = motor_increment;
@@ -181,36 +188,38 @@ int main(int argc, char *argv[]) {
         pwm_target - (velocity_cmd.turn * velocity_cmd.turn_gain);
 
     {
-    auto msg = std::make_unique<balance_robot_msgs::msg::Balance>();
+      auto msg = std::make_unique<balance_robot_msgs::msg::Balance>();
 
-    msg->header.frame_id = "robot";
-    msg->header.stamp = ros_clock.now();
+      msg->header.frame_id = "robot";
+      msg->header.stamp = ros_clock.now();
 
-    msg->velocity.setpoint = setpoint_velocity;
-    msg->velocity.measurement = measured_velocity;
-    msg->velocity.increment = setpoint_roll;
+      msg->velocity.setpoint = setpoint_velocity;
+      msg->velocity.measurement = measured_velocity;
+      msg->velocity.increment = setpoint_roll;
 
-    msg->roll.setpoint = setpoint_roll;
-    msg->roll.measurement = roll;
-    msg->roll.increment = motor_increment;
+      msg->roll.setpoint = setpoint_roll;
+      msg->roll.measurement = roll;
+      msg->roll.increment = motor_increment;
 
-    msg->motor = pwm_target;
-    msg->motor_left = pwm_target_left;
-    msg->motor_right = pwm_target_right;
+      msg->motor = pwm_target;
+      msg->motor_left = pwm_target_left;
+      msg->motor_right = pwm_target_right;
 
-    balance_pub->publish(std::move(msg));
+      balance_pub->publish(std::move(msg));
     }
 
     {
-    auto msg = std::make_unique<balance_robot_msgs::msg::Motors>();
+      auto msg = std::make_unique<balance_robot_msgs::msg::Motors>();
 
-    msg->header.frame_id = "robot";
-    msg->header.stamp = ros_clock.now();
+      msg->header.frame_id = "robot";
+      msg->header.stamp = ros_clock.now();
 
-    msg->motor0.setpoint = encoders_measurement.position_right + pwm_target_right;
-    msg->motor1.setpoint = encoders_measurement.position_left + pwm_target_left;
+      msg->motor0.setpoint =
+          encoders_measurement.position_right + pwm_target_right;
+      msg->motor1.setpoint =
+          encoders_measurement.position_left + pwm_target_left;
 
-    motors_pub->publish(std::move(msg));
+      motors_pub->publish(std::move(msg));
     }
 
     rclcpp::spin_some(node);
@@ -218,6 +227,6 @@ int main(int argc, char *argv[]) {
     pid_roll.set(pid_param_roll.p, pid_param_roll.i, pid_param_roll.d);
     pid_v.set(pid_param_v.p, pid_param_v.i, pid_param_v.d);
 
-    sleep(0.08); //FIXME: Just to get it running first
+    sleep(0.08); // FIXME: Just to get it running first
   }
 }
