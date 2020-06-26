@@ -9,6 +9,7 @@ from rclpy.node import Node
 from rclpy.exceptions import ParameterNotDeclaredException
 from rclpy.executors import SingleThreadedExecutor
 from std_msgs.msg import String
+from balance_robot_msgs.msg import Encoders
 
 class State(Enum):
     Init = 0
@@ -80,6 +81,11 @@ class OdriveMotorManager(Node):
             self.current_state = State.Control
 
         if self.target_state < self.current_state:
+            if self.target_state <= State.Calibrated:
+                self.balance_odrive.axis0.requested_state = AXIS_STATE_IDLE
+                self.balance_odrive.axis1.requested_state = AXIS_STATE_IDLE
+            if self.target_state <= State.Init:
+                self.balance_odrive.reboot()
             self.current_state = self.target_state
 
         current_state_param = rclpy.parameter.Parameter(
@@ -94,7 +100,7 @@ class OdriveMotorManager(Node):
 class OdriveMotorController(Node):
     def __init__(self, manager):
         # Calls Node.__init__('listener')
-        super().__init__('listener')
+        super().__init__('odrive_motor_controller')
         self.sub = self.create_subscription(String, 'chatter', self.chatter_callback, 10)
         self.manager
 
@@ -103,19 +109,22 @@ class OdriveMotorController(Node):
 
 class OdriveMotorEncoder(Node):
     def __init__(self, manager):
-        super().__init__('odrive_motor_controller')
+        super().__init__('odrive_motor_encoders')
         self.manager
-        self.publisher_ = self.create_publisher(String, 'topic', 10)
+        self.publisher_ = self.create_publisher(Encoders, 'balance/encoders', 10)
         timer_period = 0.05  # seconds
         self.timer = self.create_timer(timer_period, self.timer_callback)
         self.i = 0
 
     def timer_callback(self):
-        msg = String()
-        msg.data = 'Hello World: %d' % self.i
+        msg = Encoders()
+        msg.header.frame_id = "robot_base_frame"
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.encoder0.position = self.manager.odrive.axis0.encoder.pos_estimate
+        msg.encoder1.position = self.manager.odrive.axis1.encoder.pos_estimate
+        msg.encoder0.velocity = self.manager.odrive.axis0.encoder.vel_estimate
+        msg.encoder1.velocity = self.manager.odrive.axis1.encoder.vel_estimate
         self.publisher_.publish(msg)
-        self.get_logger().info('Publishing: "%s"' % msg.data)
-        self.i += 1
 
 def main(args=None):
     rclpy.init(args=args)
