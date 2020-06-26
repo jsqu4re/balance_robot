@@ -98,8 +98,12 @@ class OdriveMotorManager(Node):
                     self.target_state = State.Init
                 
             if self.target_state <= State.Init:
-                self.balance_odrive.reboot()
-                self.target_state = State.Ready
+                try:
+                    self.balance_odrive.reboot()
+                    self.target_state = State.Ready
+                except Exception as err:
+                    self.get_logger().error("unable to restart balance odrive: " + str(err))
+                    self.target_state = State.Init
             self.current_state = self.target_state
 
         current_state_param = rclpy.parameter.Parameter(
