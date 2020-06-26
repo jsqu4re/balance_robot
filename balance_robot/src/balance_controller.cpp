@@ -55,8 +55,8 @@ static vel_cmd velocity_cmd{0, 0, 10000, 70};
 static orientation orientation_measurement{.0, .0, .0, 0.2};
 static encoders encoders_measurement{.0, .0, .0, .0};
 
-static pid_param pid_param_v{0.01, 0.0, 0.0};
-static pid_param pid_param_roll{1.0, 0.0, 0.0};
+static pid_param pid_param_v{0.02, 0.0, 0.0};
+static pid_param pid_param_roll{50.0, 0.0, 0.0};
 
 void joy_topic_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
   velocity_cmd.forward = msg->axes[1];
@@ -89,11 +89,11 @@ void param_change_callback(
     if (parameter.name == "pid_roll.d")
       pid_param_roll.d = parameter.value.double_value;
 
-    if (parameter.name == "pid_v.p")
+    if (parameter.name == "pid_velocity.p")
       pid_param_v.p = parameter.value.double_value;
-    if (parameter.name == "pid_v.i")
+    if (parameter.name == "pid_velocity.i")
       pid_param_v.i = parameter.value.double_value;
-    if (parameter.name == "pid_v.d")
+    if (parameter.name == "pid_velocity.d")
       pid_param_v.d = parameter.value.double_value;
 
     if (parameter.name == "vel_cmd.forward_gain")
@@ -156,7 +156,7 @@ int main(int argc, char *argv[]) {
 
   // FIXME: PID values need to be proper
   PID pid_v = PID(-20, 20, 0.05, 0, 0);
-  PID pid_roll = PID(-500, 500, 1, 0, 0);
+  PID pid_roll = PID(-2000, 2000, 1, 0, 0);
 
   float setpoint_roll = 0;
   float setpoint_velocity = 0;
@@ -215,7 +215,7 @@ int main(int argc, char *argv[]) {
       msg->header.stamp = ros_clock.now();
 
       msg->motor0.setpoint =
-          encoders_measurement.position_right + pwm_target_right;
+          encoders_measurement.position_right - pwm_target_right;
       msg->motor1.setpoint =
           encoders_measurement.position_left + pwm_target_left;
 
