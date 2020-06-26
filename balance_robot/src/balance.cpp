@@ -401,9 +401,9 @@ int main(int argc, char *argv[]) {
       msg->roll.measurement = roll;
       msg->roll.increment = increment;
 
-      msg->target_pwm = pwm_target;
-      msg->target_pwm_left = pwm_target_left;
-      msg->target_pwm_right = pwm_target_right;
+      msg->motor = pwm_target;
+      msg->motor_left = pwm_target_left;
+      msg->motor_right = pwm_target_right;
 
       balance_pub->publish(std::move(msg));
 
