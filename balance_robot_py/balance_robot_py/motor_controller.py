@@ -107,7 +107,12 @@ class OdriveMotorController(Node):
 
     def motors_callback(self, msg):
         if self.manager.current_state == State.Control:
-            self.get_logger().info('I heard: "%s"' % msg.data)
+            try:
+                self.manager.balance_odrive.axis0.controller.pos_setpoint = msg.motor0.setpoint
+                self.manager.balance_odrive.axis1.controller.pos_setpoint = msg.motor1.setpoint
+            except:
+                self.get_logger().error("failed to send data to balance odrive .. trigger restart of odrive")
+                self.manager.target_state = State.Init
 
 class OdriveMotorEncoder(Node):
     def __init__(self, manager):
