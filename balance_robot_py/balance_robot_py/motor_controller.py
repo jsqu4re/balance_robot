@@ -24,9 +24,8 @@ class OdriveMotorManager(Node):
         super().__init__('odrive_motor_controller_node')
         timer_period = 2  # seconds
         self.timer = self.create_timer(timer_period, self.timer_callback)
-        self.declare_parameter("target_state")
-        self.declare_parameter("current_state")
-        self.target_state = State.Ready
+        self.declare_parameter("target_state", State.Ready)
+        self.declare_parameter("current_state", State.Init)
         self.current_state = State.Init
 
     def init_odrive(self):
@@ -40,6 +39,10 @@ class OdriveMotorManager(Node):
         if self.current_state == State.Init and self.target_state >= State.Ready:
             try:
                 self.init_odrive()
+                while self.balance_odrive.axis0.current_state != AXIS_STATE_IDLE:
+                    time.sleep(0.1)
+                while self.balance_odrive.axis1.current_state != AXIS_STATE_IDLE:
+                    time.sleep(0.1)
                 self.current_state = State.Ready
             except:
                 self.current_state = State.Init
@@ -129,13 +132,13 @@ class OdriveMotorEncoder(Node):
                 msg = Encoders()
                 msg.header.frame_id = "robot_base_frame"
                 msg.header.stamp = self.get_clock().now().to_msg()
-                msg.encoder0.position = self.manager.odrive.axis0.encoder.pos_estimate
-                msg.encoder1.position = self.manager.odrive.axis1.encoder.pos_estimate
-                msg.encoder0.velocity = self.manager.odrive.axis0.encoder.vel_estimate
-                msg.encoder1.velocity = self.manager.odrive.axis1.encoder.vel_estimate
+                msg.encoder0.position = self.manager.balance_odrive.axis0.encoder.pos_estimate
+                msg.encoder1.position = self.manager.balance_odrive.axis1.encoder.pos_estimate
+                msg.encoder0.velocity = self.manager.balance_odrive.axis0.encoder.vel_estimate
+                msg.encoder1.velocity = self.manager.balance_odrive.axis1.encoder.vel_estimate
                 self.publisher_.publish(msg)
-            except:
-                self.get_logger().error("failed to receive data from balance odrive .. trigger restart of odrive")
+            except Exception as err:
+                self.get_logger().error("failed to receive data from balance odrive: " + str(err) + " .. restarting odrive")
                 self.manager.target_state = State.Init
 
 def main(args=None):
