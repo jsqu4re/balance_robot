@@ -27,6 +27,7 @@ class OdriveMotorManager(Node):
         self.declare_parameter("target_state", State.Ready)
         self.declare_parameter("current_state", State.Init)
         self.current_state = State.Init
+        self.target_state = State.Init
 
     def init_odrive(self):
         self.get_logger().info("finding an odrive...")
