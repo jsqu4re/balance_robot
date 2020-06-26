@@ -113,8 +113,8 @@ class OdriveMotorController(Node):
             try:
                 self.manager.balance_odrive.axis0.controller.pos_setpoint = msg.motor0.setpoint
                 self.manager.balance_odrive.axis1.controller.pos_setpoint = msg.motor1.setpoint
-            except:
-                self.get_logger().error("failed to send data to balance odrive .. trigger restart of odrive")
+            except Exception as err:
+                self.get_logger().error("failed to send data to balance odrive: " + str(err) + " .. restarting odrive")
                 self.manager.target_state = State.Init
 
 class OdriveMotorEncoder(Node):
