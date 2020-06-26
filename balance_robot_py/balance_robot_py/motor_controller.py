@@ -33,7 +33,6 @@ class OdriveMotorManager(Node):
         self.balance_odrive = odrive.find_any()
 
     def timer_callback(self):
-        self.target_state = self.get_parameter("target_state").get_parameter_value().integer_value
         self.get_logger().info('target_state: %i' % self.target_state)
 
         if self.current_state == State.Init and self.target_state >= State.Ready:
@@ -105,6 +104,8 @@ class OdriveMotorManager(Node):
                     self.get_logger().error("unable to restart balance odrive: " + str(err) + " .. search for odrive")
                     self.target_state = State.Init
             self.current_state = self.target_state
+
+        self.target_state = self.get_parameter("target_state").get_parameter_value().integer_value
 
         current_state_param = rclpy.parameter.Parameter(
             "current_state",
