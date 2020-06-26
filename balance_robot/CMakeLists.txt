@@ -45,14 +45,25 @@ add_executable(balance
 )
 
 target_include_directories(balance PUBLIC
-  "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
-  "$<INSTALL_INTERFACE:include>"
-  ${rclcpp_INCLUDE_DIRS}
-  ${navio_vendor_INCLUDE_DIRS}
-  ${sensor_msgs_INCLUDE_DIRS}
+"$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+"$<INSTALL_INTERFACE:include>"
+${rclcpp_INCLUDE_DIRS}
+${navio_vendor_INCLUDE_DIRS}
+${sensor_msgs_INCLUDE_DIRS}
 )
 
 ament_target_dependencies(balance
+rclcpp
+navio_vendor
+sensor_msgs
+balance_robot_msgs
+)
+
+add_executable(orientation
+  src/mono_ahrs.cpp
+)
+
+ament_target_dependencies(orientation
   rclcpp
   navio_vendor
   sensor_msgs
@@ -64,6 +75,7 @@ ament_export_dependencies(rclcpp navio_vendor)
 
 install(TARGETS
   balance
+  orientation
   DESTINATION lib/${PROJECT_NAME}
 )
 
