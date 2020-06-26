@@ -1,14 +1,14 @@
-import odrive
-from odrive.enums import *
-
 from enum import IntEnum
 import time
+
+import odrive
+from odrive.enums import *
 
 import rclpy
 from rclpy.node import Node
 from rclpy.exceptions import ParameterNotDeclaredException
 from rclpy.executors import SingleThreadedExecutor
-from std_msgs.msg import String
+
 from balance_robot_msgs.msg import Encoders
 from balance_robot_msgs.msg import Motors
 
