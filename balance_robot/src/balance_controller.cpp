@@ -159,10 +159,19 @@ int main(int argc, char *argv[]) {
 
   rclcpp::Clock ros_clock(RCL_ROS_TIME);
 
+  bool missing_measurements = false;
+
   while (rclcpp::ok()) {
     if (orientation_measurements.size() == 0 && encoders_measurements.size() == 0) {
-        printf("measurements missing\n");
+        if (!missing_measurements) 
+          printf("measurements missing\n");
+        missing_measurements = true;
         continue;
+    }
+    else {
+        if (missing_measurements)
+          printf("recoverd\n");
+        missing_measurements = false;
     }
 
     orientation orientation_measurement{0,0,0,0};
@@ -237,6 +246,6 @@ int main(int argc, char *argv[]) {
     pid_roll.set(pid_param_roll.p, pid_param_roll.i, pid_param_roll.d);
     pid_v.set(pid_param_v.p, pid_param_v.i, pid_param_v.d);
 
-    sleep(0.2); //FIXME: Just to get it running first
+    sleep(0.02); //FIXME: Just to get it running first
   }
 }
