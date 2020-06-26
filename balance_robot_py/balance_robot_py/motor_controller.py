@@ -53,7 +53,7 @@ class OdriveMotorManager(Node):
                 self.get_logger().info("bus voltage is " + str(self.balance_odrive.vbus_voltage) + "V")
             except Exception as err:
                 self.get_logger().error("failed to receive data from balance odrive: " + str(err) + " .. restarting odrive")
-                self.manager.target_state = State.Init
+                self.target_state = State.Init
 
         if self.current_state == State.Ready and self.target_state >= State.Calibrated:
             try:
