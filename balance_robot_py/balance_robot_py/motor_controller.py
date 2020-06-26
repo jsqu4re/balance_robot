@@ -90,8 +90,13 @@ class OdriveMotorManager(Node):
 
         if self.target_state < self.current_state:
             if self.target_state <= State.Calibrated:
-                self.balance_odrive.axis0.requested_state = AXIS_STATE_IDLE
-                self.balance_odrive.axis1.requested_state = AXIS_STATE_IDLE
+                try:
+                    self.balance_odrive.axis0.requested_state = AXIS_STATE_IDLE
+                    self.balance_odrive.axis1.requested_state = AXIS_STATE_IDLE
+                except Exception as err:
+                    self.get_logger().error("unable to set AXIS_STATE_IDLE on balance odrive: " + str(err) + " .. restarting odrive")
+                    self.target_state = State.Init
+                
             if self.target_state <= State.Init:
                 self.balance_odrive.reboot()
                 self.target_state = State.Ready
