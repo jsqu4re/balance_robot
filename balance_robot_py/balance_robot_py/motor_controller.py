@@ -21,7 +21,7 @@ class State(IntEnum):
 
 class OdriveMotorManager(Node):
     def __init__(self):
-        super().__init__('odrive_motor_controller_node')
+        super().__init__('odrive_motor_manager')
         timer_period = 2  # seconds
         self.timer = self.create_timer(timer_period, self.timer_callback)
         self.declare_parameter("target_state", State.Ready)
@@ -136,8 +136,8 @@ class OdriveMotorController(Node):
     def motors_callback(self, msg):
         if self.manager.current_state == State.Control:
             try:
-                self.manager.balance_odrive.axis0.controller.pos_setpoint = msg.motor0.setpoint
-                self.manager.balance_odrive.axis1.controller.pos_setpoint = msg.motor1.setpoint
+                self.manager.balance_odrive.axis0.controller.vel_setpoint = msg.motor0.setpoint
+                self.manager.balance_odrive.axis1.controller.vel_setpoint = msg.motor1.setpoint
             except Exception as err:
                 self.get_logger().error("failed to send data to balance odrive: " + str(err) + " .. restarting odrive")
                 self.manager.target_state = State.Init

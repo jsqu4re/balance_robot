@@ -42,6 +42,11 @@ struct encoders {
   float velocity_right;
 };
 
+struct wheel_position {
+  float position_left;
+  float position_right;
+};
+
 struct pid_param {
   float p;
   float i;
@@ -55,8 +60,10 @@ static vel_cmd velocity_cmd{0, 0, 10000, 70};
 static orientation orientation_measurement{.0, .0, .0, 0.2};
 static encoders encoders_measurement{.0, .0, .0, .0};
 
-static pid_param pid_param_v{0.02, 0.0, 0.0};
-static pid_param pid_param_roll{50.0, 0.0, 0.0};
+static pid_param pid_param_v{0.02, .0, .0};
+static pid_param pid_param_roll{50.0, .0, .0};
+
+static wheel_position motor_position{.0, .0};
 
 void joy_topic_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
   velocity_cmd.forward = msg->axes[1];
@@ -214,10 +221,11 @@ int main(int argc, char *argv[]) {
       msg->header.frame_id = "robot";
       msg->header.stamp = ros_clock.now();
 
-      msg->motor0.setpoint =
-          encoders_measurement.position_right - pwm_target_right;
-      msg->motor1.setpoint =
-          encoders_measurement.position_left + pwm_target_left;
+      motor_position.position_left += pwm_target_left;
+      motor_position.position_right -= pwm_target_right;
+
+      msg->motor0.setpoint = pwm_target_right;
+      msg->motor1.setpoint = pwm_target_left;
 
       motors_pub->publish(std::move(msg));
     }

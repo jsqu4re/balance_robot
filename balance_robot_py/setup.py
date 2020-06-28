@@ -20,7 +20,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'motor_controller = balance_robot_py.motor_controller:main'
+            'motor_controller = balance_robot_py.motor_controller:main',
+            'xbox_controller = balance_robot_py.xbox_controller:main'
         ],
     },
 )
