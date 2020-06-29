@@ -61,7 +61,7 @@ static orientation orientation_measurement{.0, .0, .0, 0.2};
 static encoders encoders_measurement{.0, .0, .0, .0};
 
 static pid_param pid_param_v{0.02, .0, .0};
-static pid_param pid_param_roll{50.0, .0, .0};
+static pid_param pid_param_roll{500.0, .0, .0};
 
 static wheel_position motor_position{.0, .0};
 
@@ -163,7 +163,7 @@ int main(int argc, char *argv[]) {
 
   // FIXME: PID values need to be proper
   PID pid_v = PID(-20, 20, 0.05, 0, 0);
-  PID pid_roll = PID(-2000, 2000, 1, 0, 0);
+  PID pid_roll = PID(-10000, 10000, 1, 0, 0);
 
   float setpoint_roll = 0;
   float setpoint_velocity = 0;
@@ -224,7 +224,7 @@ int main(int argc, char *argv[]) {
       motor_position.position_left += pwm_target_left;
       motor_position.position_right -= pwm_target_right;
 
-      msg->motor0.setpoint = pwm_target_right;
+      msg->motor0.setpoint = pwm_target_right * -1;
       msg->motor1.setpoint = pwm_target_left;
 
       motors_pub->publish(std::move(msg));
