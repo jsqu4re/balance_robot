@@ -55,7 +55,7 @@ struct pid_param {
 
 static float main_loop = 0.02;
 
-static vel_cmd velocity_cmd{0, 0, 10000, 70};
+static vel_cmd velocity_cmd{0, 0, 20, 1000};
 
 static orientation orientation_measurement{.0, .0, .0, 0.2};
 static encoders encoders_measurement{.0, .0, .0, .0};
@@ -162,10 +162,11 @@ int main(int argc, char *argv[]) {
       parameters_client->on_parameter_event(param_change_callback);
 
   // FIXME: PID values need to be proper
-  PID pid_v = PID(-20, 20, 0.05, 0, 0);
-  PID pid_roll = PID(-10000, 10000, 1, 0, 0);
+  PID pid_v = PID(-10, 10, 0.05, 0, 0);
+  PID pid_roll = PID(-20000, 20000, 1, 0, 0);
 
   float setpoint_roll = 0;
+  float setpoint_roll_offset = 7.5;
   float setpoint_velocity = 0;
   float dtsum = 0;
   float roll = 0;
@@ -184,6 +185,7 @@ int main(int argc, char *argv[]) {
     // pid controllers
     setpoint_roll =
         pid_v.calculate(setpoint_velocity, measured_velocity, dtsum);
+    setpoint_roll = setpoint_roll + setpoint_roll_offset;
     motor_increment = pid_roll.calculate(setpoint_roll, roll, dtsum);
 
     float pwm_target = motor_increment;
@@ -221,11 +223,11 @@ int main(int argc, char *argv[]) {
       msg->header.frame_id = "robot";
       msg->header.stamp = ros_clock.now();
 
-      motor_position.position_left += pwm_target_left;
-      motor_position.position_right -= pwm_target_right;
+      // motor_position.position_left += pwm_target_left;
+      // motor_position.position_right -= pwm_target_right;
 
-      msg->motor0.setpoint = pwm_target_right * -1;
       msg->motor1.setpoint = pwm_target_left;
+      msg->motor0.setpoint = pwm_target_right * -1;
 
       motors_pub->publish(std::move(msg));
     }
