@@ -61,7 +61,7 @@ static vel_cmd velocity_cmd{0, 0, 20, 10000};
 static orientation orientation_measurement{.0, .0, .0, .2};
 static encoders encoders_measurement{.0, .0, .0, .0};
 
-static float vel_lowpass{500};
+static float vel_lowpass{200};
 static pid_param pid_param_v{.001, .004, .0, .0};
 static pid_param pid_param_roll{1200.0, 800.0, 30.0, 6.0};
 
@@ -117,8 +117,8 @@ void param_change_callback(
     if (parameter.name == "main_loop")
       main_loop = parameter.value.double_value;
   }
-  printf("Updated PID_roll: P %+05.2f I %+05.2f D %+05.2f PID_velocity: P "
-         "%+05.2f I %+05.2f D %+05.2f\n",
+  printf("Updated PID_roll: P %+05.5f I %+05.5f D %+05.5f PID_velocity: P "
+         "%+05.5f I %+05.5f D %+05.5f\n",
          pid_param_roll.p, pid_param_roll.i, pid_param_roll.d, pid_param_v.p,
          pid_param_v.i, pid_param_v.d);
 }
@@ -189,7 +189,7 @@ int main(int argc, char *argv[]) {
     dtsum = orientation_measurement.dt;
     roll = orientation_measurement.roll;
     setpoint_velocity = velocity_cmd.forward * velocity_cmd.forward_gain;
-    float measured_velocity = (encoders_measurement.velocity_left +
+    float measured_velocity = (encoders_measurement.velocity_left -
                                encoders_measurement.velocity_right) /
                               2;
     
