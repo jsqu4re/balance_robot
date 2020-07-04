@@ -61,6 +61,7 @@ static vel_cmd velocity_cmd{0, 0, 20, 10000};
 static orientation orientation_measurement{.0, .0, .0, .2};
 static encoders encoders_measurement{.0, .0, .0, .0};
 
+static float vel_lowpass{500};
 static pid_param pid_param_v{.001, .004, .0, .0};
 static pid_param pid_param_roll{1200.0, 800.0, 30.0, 6.0};
 
@@ -138,6 +139,8 @@ int main(int argc, char *argv[]) {
   node->declare_parameter("pid_velocity.d", pid_param_v.d);
   node->declare_parameter("pid_velocity.offset", pid_param_v.offset);
 
+  node->declare_parameter("vel_lowpass", vel_lowpass);
+
   node->declare_parameter("vel_cmd.forward_gain", velocity_cmd.forward_gain);
   node->declare_parameter("vel_cmd.turn_gain", velocity_cmd.turn_gain);
 
@@ -190,7 +193,7 @@ int main(int argc, char *argv[]) {
                                encoders_measurement.velocity_right) /
                               2;
     
-    velocity_lp = (velocity_lp * 500 + measured_velocity) / 501;
+    velocity_lp = (velocity_lp * vel_lowpass + measured_velocity) / (vel_lowpass + 1);
 
     // pid controllers
     setpoint_roll =
