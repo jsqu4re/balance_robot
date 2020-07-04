@@ -51,17 +51,18 @@ struct pid_param {
   float p;
   float i;
   float d;
+  float offset;
 };
 
 static float main_loop = 0.02;
 
-static vel_cmd velocity_cmd{0, 0, 20, 1000};
+static vel_cmd velocity_cmd{0, 0, 20, 10000};
 
-static orientation orientation_measurement{.0, .0, .0, 0.2};
+static orientation orientation_measurement{.0, .0, .0, .2};
 static encoders encoders_measurement{.0, .0, .0, .0};
 
-static pid_param pid_param_v{0.02, .0, .0};
-static pid_param pid_param_roll{500.0, .0, .0};
+static pid_param pid_param_v{.001, .004, .0, .0};
+static pid_param pid_param_roll{1200.0, 800.0, 30.0, 6.0};
 
 static wheel_position motor_position{.0, .0};
 
@@ -95,6 +96,8 @@ void param_change_callback(
       pid_param_roll.i = parameter.value.double_value;
     if (parameter.name == "pid_roll.d")
       pid_param_roll.d = parameter.value.double_value;
+    if (parameter.name == "pid_roll.offset")
+      pid_param_roll.offset = parameter.value.double_value;
 
     if (parameter.name == "pid_velocity.p")
       pid_param_v.p = parameter.value.double_value;
@@ -102,6 +105,8 @@ void param_change_callback(
       pid_param_v.i = parameter.value.double_value;
     if (parameter.name == "pid_velocity.d")
       pid_param_v.d = parameter.value.double_value;
+    if (parameter.name == "pid_velocity.offset")
+      pid_param_v.offset = parameter.value.double_value;
 
     if (parameter.name == "vel_cmd.forward_gain")
       velocity_cmd.forward_gain = parameter.value.double_value;
@@ -126,10 +131,12 @@ int main(int argc, char *argv[]) {
   node->declare_parameter("pid_roll.p", pid_param_roll.p);
   node->declare_parameter("pid_roll.i", pid_param_roll.i);
   node->declare_parameter("pid_roll.d", pid_param_roll.d);
+  node->declare_parameter("pid_roll.offset", pid_param_roll.offset);
 
   node->declare_parameter("pid_velocity.p", pid_param_v.p);
   node->declare_parameter("pid_velocity.i", pid_param_v.i);
   node->declare_parameter("pid_velocity.d", pid_param_v.d);
+  node->declare_parameter("pid_velocity.offset", pid_param_v.offset);
 
   node->declare_parameter("vel_cmd.forward_gain", velocity_cmd.forward_gain);
   node->declare_parameter("vel_cmd.turn_gain", velocity_cmd.turn_gain);
@@ -161,16 +168,17 @@ int main(int argc, char *argv[]) {
   auto callback_handler =
       parameters_client->on_parameter_event(param_change_callback);
 
-  // FIXME: PID values need to be proper
-  PID pid_v = PID(-10, 10, 0.05, 0, 0);
-  PID pid_roll = PID(-20000, 20000, 1, 0, 0);
+  // FIXME: PID value ranges need to be aligned
+  PID pid_v = PID(-10, 10, 0, 0, 0);
+  PID pid_roll = PID(-30000, 30000, 0, 0, 0);
 
   float setpoint_roll = 0;
-  float setpoint_roll_offset = 7.5;
+  float setpoint_roll_offset = pid_param_roll.offset;
   float setpoint_velocity = 0;
   float dtsum = 0;
   float roll = 0;
   float motor_increment = 0;
+  float velocity_lp = 0;
 
   rclcpp::Clock ros_clock(RCL_ROS_TIME);
 
@@ -181,10 +189,12 @@ int main(int argc, char *argv[]) {
     float measured_velocity = (encoders_measurement.velocity_left +
                                encoders_measurement.velocity_right) /
                               2;
+    
+    velocity_lp = (velocity_lp * 500 + measured_velocity) / 501;
 
     // pid controllers
     setpoint_roll =
-        pid_v.calculate(setpoint_velocity, measured_velocity, dtsum);
+        pid_v.calculate(setpoint_velocity, velocity_lp, dtsum);
     setpoint_roll = setpoint_roll + setpoint_roll_offset;
     motor_increment = pid_roll.calculate(setpoint_roll, roll, dtsum);
 
@@ -203,7 +213,7 @@ int main(int argc, char *argv[]) {
       msg->header.stamp = ros_clock.now();
 
       msg->velocity.setpoint = setpoint_velocity;
-      msg->velocity.measurement = measured_velocity;
+      msg->velocity.measurement = velocity_lp;
       msg->velocity.increment = setpoint_roll;
 
       msg->roll.setpoint = setpoint_roll;
