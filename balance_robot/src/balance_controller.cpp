@@ -62,7 +62,7 @@ static orientation orientation_measurement{.0, .0, .0, .2};
 static encoders encoders_measurement{.0, .0, .0, .0};
 
 static float vel_lowpass{20};
-static pid_param pid_param_v{.00001, .0000001, .0, .0};
+static pid_param pid_param_v{.0001, .000001, .0, .0};
 static pid_param pid_param_roll{1100.0, 700.0, 90.0, 6.0};
 
 static wheel_position motor_position{.0, .0};
@@ -172,7 +172,7 @@ int main(int argc, char *argv[]) {
       parameters_client->on_parameter_event(param_change_callback);
 
   // FIXME: PID value ranges need to be aligned
-  PID pid_v = PID(-10, 10, 0, 0, 0);
+  PID pid_v = PID(-30, 30, 0, 0, 0);
   PID pid_roll = PID(-30000, 30000, 0, 0, 0);
 
   float setpoint_roll = 0;
