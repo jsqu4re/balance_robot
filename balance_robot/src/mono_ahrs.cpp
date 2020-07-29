@@ -146,7 +146,7 @@ int main(int argc, char *argv[]) {
 
   rclcpp::QoS qos(rclcpp::KeepLast(10));
   auto balance_pub = node->create_publisher<balance_robot_msgs::msg::Orientation>(
-      "balance/orientation", qos);
+      "balance/orientation/imu", qos);
 
 //  auto parameters_client =
 //      std::make_shared<rclcpp::AsyncParametersClient>(node);

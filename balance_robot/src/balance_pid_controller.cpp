@@ -159,7 +159,7 @@ int main(int argc, char *argv[]) {
 
   auto orientation_subscription =
       node->create_subscription<balance_robot_msgs::msg::Orientation>(
-          "balance/orientation", 10, orientation_topic_callback);
+          "balance/orientation/imu", 10, orientation_topic_callback);
 
   auto encoders_subscription =
       node->create_subscription<balance_robot_msgs::msg::Encoders>(
@@ -192,7 +192,7 @@ int main(int argc, char *argv[]) {
     float measured_velocity = (encoders_measurement.velocity_right -
                                encoders_measurement.velocity_left) /
                               2;
-    
+
     velocity_lp = (velocity_lp * vel_lowpass + measured_velocity) / (vel_lowpass + 1);
 
     // pid controllers

@@ -28,7 +28,7 @@ int main(int argc, char * argv[])
 
   auto node = rclcpp::Node::make_shared("serial_publisher_ow_right");
 
-  auto publisher = node->create_publisher<balance_robot_msgs::msg::Orientation>("/balance/outerwheel/right", 10);
+  auto publisher = node->create_publisher<balance_robot_msgs::msg::Orientation>("balance/orientation/ow", 10);
 
   char* sensor_port = "/dev/ttyACM0";
 	int sensor = serialOpen(sensor_port, 9600);

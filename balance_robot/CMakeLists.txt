@@ -38,8 +38,8 @@ target_include_directories(${PROJECT_NAME} PUBLIC
 ament_export_include_directories(include)
 ament_export_interfaces(export_${PROJECT_NAME})
 ament_export_libraries(${PROJECT_NAME})
-  
-add_executable(balance 
+
+add_executable(balance
   src/balance.cpp
   src/pid.cpp
 )
@@ -70,19 +70,39 @@ ament_target_dependencies(orientation
   balance_robot_msgs
 )
 
-add_executable(controller
-  src/balance_controller.cpp
+add_executable(pid_controller
+  src/balance_pid_controller.cpp
   src/pid.cpp
 )
 
-ament_target_dependencies(controller
+ament_target_dependencies(pid_controller
   rclcpp
   navio_vendor
   sensor_msgs
   balance_robot_msgs
 )
 
-target_include_directories(controller PUBLIC
+target_include_directories(pid_controller PUBLIC
+  "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+  "$<INSTALL_INTERFACE:include>"
+  ${rclcpp_INCLUDE_DIRS}
+  ${navio_vendor_INCLUDE_DIRS}
+  ${sensor_msgs_INCLUDE_DIRS}
+)
+
+add_executable(lqr_controller
+  src/balance_lqr_controller.cpp
+  src/pid.cpp
+)
+
+ament_target_dependencies(lqr_controller
+  rclcpp
+  navio_vendor
+  sensor_msgs
+  balance_robot_msgs
+)
+
+target_include_directories(lqr_controller PUBLIC
   "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
   "$<INSTALL_INTERFACE:include>"
   ${rclcpp_INCLUDE_DIRS}
@@ -96,7 +116,8 @@ ament_export_dependencies(rclcpp navio_vendor)
 install(TARGETS
   balance
   orientation
-  controller
+  pid_controller
+  lqr_controller
   DESTINATION lib/${PROJECT_NAME}
 )
 
