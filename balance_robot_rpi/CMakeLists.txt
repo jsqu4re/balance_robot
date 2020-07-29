@@ -17,6 +17,8 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(balance_robot_msgs REQUIRED)
 
 find_library(wiringPi_LIB wiringPi REQUIRED)
 
@@ -37,11 +39,20 @@ install(TARGETS serial_test
   EXPORT export_${PROJECT_NAME}
   DESTINATION lib/${PROJECT_NAME})
 
-
 add_executable(serial_publisher src/serial_publisher.cpp)
+
 target_include_directories(serial_publisher PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
+
+ament_target_dependencies(serial_publisher
+  rclcpp
+  balance_robot_msgs
+)
+
+target_link_libraries(serial_publisher
+  ${wiringPi_LIB}
+)
 
 install(TARGETS serial_publisher
   EXPORT export_${PROJECT_NAME}

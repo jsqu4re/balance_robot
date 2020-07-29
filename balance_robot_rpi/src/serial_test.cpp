@@ -14,31 +14,22 @@ using json = nlohmann::json;
 
 using namespace std;
 
-int main(int argc, char ** argv)
-{
-	char* levelSensorPort = "/dev/ttyACM0"; //Serial Device Address
+int main(int argc, char ** argv) {
+	char* levelSensorPort = "/dev/ttyACM0";
 
 	int levelSensor = serialOpen(levelSensorPort, 9600);
 	wiringPiSetup();
-	serialPuts(levelSensor, "DP"); //Send command to the serial device
 
 	string combined = "";
-
-	while (1)
-	{
+	while (1) {
 		char buffer[200];
 		ssize_t length = read(levelSensor, &buffer, sizeof(buffer));
-		if (length == -1)
-		{
+		if (length == -1) {
 			cerr << "Error reading from serial port" << endl;
 			break;
-		}
-		else if (length == 0)
-		{
+		} else if (length == 0) {
 			sleep(0.2);
-		}
-		else
-		{
+		} else {
 			buffer[length] = '\0';
 			combined += string(buffer);
 
@@ -61,6 +52,5 @@ int main(int argc, char ** argv)
 			}
 		}
 	}
-
 	return 0;
 }
