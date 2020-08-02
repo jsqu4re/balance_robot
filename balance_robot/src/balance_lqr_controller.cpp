@@ -3,9 +3,10 @@
 #include <chrono>
 #include <functional>
 #include <string>
+#include <memory>
 
 #include <arpa/inet.h>
-#include <memory>
+#include <math.h>
 #include <netinet/in.h>
 #include <signal.h>
 #include <stdint.h>
@@ -95,12 +96,20 @@ void orientation_ow_topic_callback(
   orientation_ow_measurement.dt = msg->dt;
 }
 
+double cprToRad(double cpr_value) {
+  return cpr_value * 2 * M_PI / 8192;
+}
+
+double radToCpr(double rad_value) {
+  return rad_value * 8192 / (2 * M_PI);
+}
+
 void encoders_topic_callback(
     const balance_robot_msgs::msg::Encoders::SharedPtr msg) {
-  encoders_measurement.position_left = msg->encoder1.position * -1;
-  encoders_measurement.position_right = msg->encoder0.position;
-  encoders_measurement.velocity_left = msg->encoder1.velocity * -1;
-  encoders_measurement.velocity_right = msg->encoder0.velocity;
+  encoders_measurement.position_left = cprToRad(msg->encoder1.position * -1); // FIXME: This is not sufficient to change motor direction
+  encoders_measurement.position_right = cprToRad(msg->encoder0.position);
+  encoders_measurement.velocity_left = cprToRad(msg->encoder1.velocity * -1);
+  encoders_measurement.velocity_right = cprToRad(msg->encoder0.velocity);
   combined_inner_wheel.position = encoders_measurement.position_right;
   combined_inner_wheel.velocity = (encoders_measurement.velocity_right + encoders_measurement.velocity_left) / 2;
 }
@@ -214,8 +223,8 @@ int main(int argc, char *argv[]) {
       msg->header.frame_id = "robot";
       msg->header.stamp = ros_clock.now();
 
-      msg->motor1.setpoint = pwm_target_left;
-      msg->motor0.setpoint = pwm_target_right * -1;
+      msg->motor1.setpoint = radToCpr(pwm_target_left);
+      msg->motor0.setpoint = radToCpr(pwm_target_right * -1);
 
       motors_pub->publish(std::move(msg));
     }
