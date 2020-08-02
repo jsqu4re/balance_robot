@@ -163,7 +163,7 @@ int main(int argc, char *argv[]) {
   float velocity_lp = 0;
 
   float state_x [6] = {0, 0, 0, 0, 0, 0};
-  float control_k [6] = {-213.799, -17.0779, 0.109633, -0.002333, -3.16227, -1.11159};
+  float control_k [6] = {-453.11421438, -41.03540067, 15.17484972, -6.16366411, -4.47213596, -4.30609058};
 
   rclcpp::Clock ros_clock(RCL_ROS_TIME);
 
