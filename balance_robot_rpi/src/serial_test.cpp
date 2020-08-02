@@ -40,6 +40,9 @@ int main(int argc, char ** argv) {
 						cout << "pitch     :  " << j["P"] << endl;
 						cout << "roll      :  " << j["R"] << endl;
 						cout << "yaw       :  " << j["Y"] << endl;
+						cout << "d pitch   :  " << j["dP"] << endl;
+						cout << "d roll    :  " << j["dR"] << endl;
+						cout << "d yaw     :  " << j["dY"] << endl;
 						cout << "frequency :  " << j["f"] << endl;
 						cout << "---" << endl;
 					} catch (const std::exception& e) {

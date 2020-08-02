@@ -59,6 +59,9 @@ int main(int argc, char * argv[])
 						msg->pitch = j["P"].get<double>();
 						msg->roll = j["R"].get<double>();
 						msg->yaw = j["Y"].get<double>();
+						msg->d_pitch = j["dP"].get<double>();
+						msg->d_roll = j["dR"].get<double>();
+						msg->d_yaw = j["dY"].get<double>();
             if (j["f"] > 0) {
 						  msg->dt = 1. / j["f"].get<double>();
             }
