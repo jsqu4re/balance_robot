@@ -9,6 +9,7 @@
 #include "rclcpp/rclcpp.hpp"
 
 #include <arpa/inet.h>
+#include <math.h>
 #include <memory>
 #include <netinet/in.h>
 #include <signal.h>
@@ -21,7 +22,7 @@
 
 #include <balance_robot_msgs/msg/orientation.hpp>
 
-static float main_loop = 0.02;
+static float main_loop = 0.01;
 
 struct roll_dt {
   float roll;
@@ -194,8 +195,11 @@ int main(int argc, char *argv[]) {
 
   rclcpp::Clock ros_clock(RCL_ROS_TIME);
 
-  float roll, pitch, yaw;
+  float roll, pitch, yaw, d_roll, d_pitch, d_yaw;
   float dtsum = 0;
+
+  bool fresh = true;
+  roll_dt last_measurement{0,0,0,0};
 
   while (rclcpp::ok()) {
     roll_dt measurement = imuLoop(ahrs.get());
@@ -205,21 +209,43 @@ int main(int argc, char *argv[]) {
     pitch = measurement.pitch;
     yaw = measurement.yaw;
 
+    if (fresh){
+      d_roll = (measurement.roll - last_measurement.roll) / measurement.dt;
+      d_pitch = (measurement.pitch - last_measurement.pitch) / measurement.dt;
+      d_yaw = (measurement.yaw - last_measurement.yaw) / measurement.dt;
+      fresh = false;
+    } else {
+      // Add low pass characteristics
+      d_roll = (d_roll + (measurement.roll - last_measurement.roll) / measurement.dt) / 2;
+      d_pitch = (d_pitch + (measurement.pitch - last_measurement.pitch) / measurement.dt) / 2;
+      d_yaw = (d_yaw + (measurement.yaw - last_measurement.yaw) / measurement.dt) / 2;
+    }
+
+    last_measurement = measurement;
+
     if (dtsum > main_loop) {
+      fresh = true;
 
       auto msg = std::make_unique<balance_robot_msgs::msg::Orientation>();
 
       msg->header.frame_id = "balance_robot_imu";
       msg->header.stamp = ros_clock.now();
 
-      msg->roll = roll;
-      msg->pitch = pitch;
-      msg->yaw = yaw;
+      msg->roll = roll * (M_PI / 180);
+      msg->pitch = pitch * (M_PI / 180);
+      msg->yaw = yaw * (M_PI / 180);
+
+      msg->d_roll = d_roll * (M_PI / 180);
+      msg->d_pitch = d_pitch * (M_PI / 180);
+      msg->d_yaw = d_yaw * (M_PI / 180);
 
       msg->dt = dtsum;
 
       balance_pub->publish(std::move(msg));
 
+      d_roll = 0;
+      d_pitch = 0;
+      d_yaw = 0;
       dtsum = 0;
 
       rclcpp::spin_some(node);
