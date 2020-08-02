@@ -179,8 +179,8 @@ int main(int argc, char *argv[]) {
   while (rclcpp::ok()) {
     state_x[0] = orientation_imu_measurement.roll;
     state_x[1] = orientation_imu_measurement.d_roll;
-    state_x[2] = orientation_ow_measurement.pitch;
-    state_x[3] = orientation_ow_measurement.d_pitch;
+    state_x[2] = -1 * orientation_ow_measurement.pitch;
+    state_x[3] = -1 * orientation_ow_measurement.d_pitch;
     state_x[4] = combined_inner_wheel.position;
     state_x[5] = combined_inner_wheel.velocity;
 
