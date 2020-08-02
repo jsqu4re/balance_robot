@@ -190,7 +190,6 @@ int main(int argc, char *argv[]) {
       measurement = imuLoop(ahrs.get());
       rclcpp::spin_some(node);
     }
-    printf("ready! %+05.2f\n", measurement.roll);
   }
 
   rclcpp::Clock ros_clock(RCL_ROS_TIME);
