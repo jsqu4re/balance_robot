@@ -191,7 +191,7 @@ int main(int argc, char *argv[]) {
     }
 
     auto current_stamp = ros_clock.now();
-    float pwm_target = motor_increment * main_loop; // v = a * t
+    float pwm_target = state_x[5] + motor_increment * main_loop; // v = v_measurement + a * t
 
     float pwm_target_left =
         pwm_target + (velocity_cmd.turn * velocity_cmd.turn_gain);
