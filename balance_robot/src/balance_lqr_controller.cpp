@@ -56,7 +56,7 @@ struct inner_wheel {
   float velocity;
 };
 
-static float main_loop = 0.02;
+static float main_loop = 0.08;
 
 static vel_cmd velocity_cmd{0, 0, 40000, 5000};
 
@@ -172,6 +172,7 @@ int main(int argc, char *argv[]) {
   float velocity_lp = 0;
 
   float state_x [6] = {0, 0, 0, 0, 0, 0};
+  float target_w [6] = {0.114, 0, 0, 0, 0, 0};
   float control_k [6] = {-453.11421438, -41.03540067, 15.17484972, -6.16366411, -4.47213596, -4.30609058};
 
   rclcpp::Clock ros_clock(RCL_ROS_TIME);
@@ -186,10 +187,11 @@ int main(int argc, char *argv[]) {
 
     motor_increment = 0;
     for (int i = 0; i < 6; ++i){
-      motor_increment += state_x[i] * control_k[i];
+      motor_increment += (state_x[i] - target_w[i]) * control_k[i];
     }
 
-    float pwm_target = motor_increment;
+    auto current_stamp = ros_clock.now();
+    float pwm_target = motor_increment * main_loop; // v = a * t
 
     float pwm_target_left =
         pwm_target + (velocity_cmd.turn * velocity_cmd.turn_gain);
@@ -200,7 +202,7 @@ int main(int argc, char *argv[]) {
       auto msg = std::make_unique<balance_robot_msgs::msg::Balance>();
 
       msg->header.frame_id = "robot";
-      msg->header.stamp = ros_clock.now();
+      msg->header.stamp = current_stamp;
 
       msg->velocity.setpoint = 0;
       msg->velocity.measurement = 0;
@@ -221,15 +223,14 @@ int main(int argc, char *argv[]) {
       auto msg = std::make_unique<balance_robot_msgs::msg::Motors>();
 
       msg->header.frame_id = "robot";
-      msg->header.stamp = ros_clock.now();
+      msg->header.stamp = current_stamp;
 
       msg->motor1.setpoint = radToCpr(pwm_target_left);
       msg->motor0.setpoint = radToCpr(pwm_target_right * -1);
 
       motors_pub->publish(std::move(msg));
     }
-
     rclcpp::spin_some(node);
-    sleep(0.08);
+    sleep(main_loop);
   }
 }
