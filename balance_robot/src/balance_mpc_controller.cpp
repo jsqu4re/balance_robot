@@ -20,7 +20,9 @@
 #include <balance_robot_msgs/msg/orientation.hpp>
 #include <sensor_msgs/msg/joy.hpp>
 
-#include <balance_robot/pid.h>
+#include <dlib/control.h>
+
+using namespace dlib;
 
 struct vel_cmd {
   float forward;
@@ -171,27 +173,70 @@ int main(int argc, char *argv[]) {
   float motor_increment = 0;
   float velocity_lp = 0;
 
-  float state_x [6] = {0, 0, 0, 0, 0, 0};
-  float target_w [6] = {0.1415, 0, 0, 0, 0, 0};
-  float control_k [6] = {-453.11421438, -41.03540067, 15.17484972, -6.16366411, -4.47213596, -4.30609058};
+
+
+  const int STATES = 6;
+  const int CONTROLS = 1;
+
+  matrix<double,STATES,1> current_state;
+  current_state = 0,0,0,0,0,0;
+
+  matrix<double,STATES,1> target_state;
+  target_state = 0.1415,0,0,0,0,0;
+
+  matrix<double,STATES,STATES> A;
+  A =  1.62808335e+00,  1.12579382e-01, -0.00000000e+00, -0.00000000e+00, -0.00000000e+00, -0.00000000e+00,
+       1.34683383e+01,  1.46065417e+00,  0.00000000e+00,  0.00000000e+00,  0.00000000e+00,  0.00000000e+00,
+       0.00000000e+00,  0.00000000e+00,  5.02317008e-01,  7.70948122e-02,  0.00000000e+00,  2.05294378e-05,
+      -0.00000000e+00, -0.00000000e+00, -8.79733272e+00,  4.05398123e-01, -0.00000000e+00,  3.40513655e-04,
+       0.00000000e+00,  0.00000000e+00, -1.74678326e-04,  4.25539709e-05,  1.00000000e+00,  8.64210138e-02,
+       0.00000000e+00,  0.00000000e+00, -4.85585774e-03,  7.05825866e-04,  0.00000000e+00,  7.41307296e-01;
+
+  matrix<double,STATES,CONTROLS> B;
+  B =  -0.70508113,
+      -15.11944431,
+        0.95705824,
+       16.92134030,
+        2.32133538,
+       44.22661332;
+
+  matrix<double,STATES,1> C;
+  C = 0,
+      0,
+      0,
+      0,
+      0,
+      0;
+
+
+  const int HORIZON = 5;
+
+  matrix<double,STATES,1> Q;
+  Q = 5, 1, 0.1, 4, 2, 1;
+
+  matrix<double,CONTROLS,1> R, lower, upper;
+  R = 0.1;
+  lower = -10.0;
+  upper =  10.0;
+
+  mpc<STATES,CONTROLS,HORIZON> controller(A,B,C,Q,R,lower,upper);
+  controller.set_target(target_state);
 
   rclcpp::Clock ros_clock(RCL_ROS_TIME);
 
   while (rclcpp::ok()) {
-    state_x[0] = orientation_imu_measurement.roll;
-    state_x[1] = orientation_imu_measurement.d_roll;
-    state_x[2] = -1 * orientation_ow_measurement.pitch;
-    state_x[3] = -1 * orientation_ow_measurement.d_pitch;
-    state_x[4] = combined_inner_wheel.position;
-    state_x[5] = combined_inner_wheel.velocity;
+    current_state(0) = orientation_imu_measurement.roll;
+    current_state(1) = orientation_imu_measurement.d_roll;
+    current_state(2) = -1 * orientation_ow_measurement.pitch;
+    current_state(3) = -1 * orientation_ow_measurement.d_pitch;
+    current_state(4) = combined_inner_wheel.position;
+    current_state(5) = combined_inner_wheel.velocity;
 
-    motor_increment = 0;
-    for (int i = 0; i < 6; ++i){
-      motor_increment += (state_x[i] - target_w[i]) * control_k[i];
-    }
+    matrix<double,CONTROLS,1> action = controller(current_state);
 
     auto current_stamp = ros_clock.now();
-    float pwm_target = state_x[5] + motor_increment * (main_loop + 0.02); // v = v_measurement + a * t
+    // float pwm_target = current_state(5) + action(0);
+    float pwm_target = action(0);
 
     float pwm_target_left =
         pwm_target + (velocity_cmd.turn * velocity_cmd.turn_gain);

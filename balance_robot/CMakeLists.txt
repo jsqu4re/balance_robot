@@ -22,6 +22,13 @@ find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(balance_robot_msgs REQUIRED)
 
+# add dlib
+# FIXME: This could be done more colcon like
+add_subdirectory(../../dlib dlib_build)
+
+# link it to an executable via
+# target_link_libraries(executable dlib::dlib)
+
 add_library(${PROJECT_NAME} SHARED
   "src/pid.cpp"
 )
@@ -92,7 +99,7 @@ target_include_directories(pid_controller PUBLIC
 
 add_executable(lqr_controller
   src/balance_lqr_controller.cpp
-  src/pid.cpp
+  src/pid.cpp # Should not be necessary ..
 )
 
 ament_target_dependencies(lqr_controller
@@ -110,6 +117,27 @@ target_include_directories(lqr_controller PUBLIC
   ${sensor_msgs_INCLUDE_DIRS}
 )
 
+add_executable(mpc_controller
+  src/balance_mpc_controller.cpp
+)
+
+ament_target_dependencies(mpc_controller
+  rclcpp
+  navio_vendor
+  sensor_msgs
+  balance_robot_msgs
+)
+
+target_include_directories(mpc_controller PUBLIC
+  "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+  "$<INSTALL_INTERFACE:include>"
+  ${rclcpp_INCLUDE_DIRS}
+  ${navio_vendor_INCLUDE_DIRS}
+  ${sensor_msgs_INCLUDE_DIRS}
+)
+
+target_link_libraries(mpc_controller dlib::dlib)
+
 ament_export_dependencies(rclcpp navio_vendor)
 # ament_export_interfaces(export_balance HAS_LIBRARY_TARGET)
 
@@ -118,6 +146,7 @@ install(TARGETS
   orientation
   pid_controller
   lqr_controller
+  mpc_controller
   DESTINATION lib/${PROJECT_NAME}
 )
 
