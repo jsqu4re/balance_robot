@@ -216,8 +216,8 @@ int main(int argc, char *argv[]) {
 
   matrix<double,CONTROLS,1> R, lower, upper;
   R = 0.1;
-  lower = -10.0;
-  upper =  10.0;
+  lower = -50.0;
+  upper =  50.0;
 
   mpc<STATES,CONTROLS,HORIZON> controller(A,B,C,Q,R,lower,upper);
   controller.set_target(target_state);
@@ -270,8 +270,8 @@ int main(int argc, char *argv[]) {
       msg->header.frame_id = "robot";
       msg->header.stamp = current_stamp;
 
-      msg->motor1.setpoint = radToCpr(pwm_target_left);
-      msg->motor0.setpoint = radToCpr(pwm_target_right * -1);
+      msg->motor1.setpoint = radToCpr(pwm_target_left * -1);
+      msg->motor0.setpoint = radToCpr(pwm_target_right);
 
       motors_pub->publish(std::move(msg));
     }

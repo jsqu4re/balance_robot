@@ -58,7 +58,7 @@ struct inner_wheel {
 
 static float main_loop = 0.08;
 
-static vel_cmd velocity_cmd{0, 0, 40000, 5000};
+static vel_cmd velocity_cmd{0, 0, 0.05, 3};
 
 static orientation orientation_imu_measurement{.0, .0, .0, .2};
 static orientation orientation_ow_measurement{.0, .0, .0, .2};
@@ -185,18 +185,31 @@ int main(int argc, char *argv[]) {
     state_x[4] = combined_inner_wheel.position;
     state_x[5] = combined_inner_wheel.velocity;
 
-    motor_increment = 0;
-    for (int i = 0; i < 6; ++i){
-      motor_increment += (state_x[i] - target_w[i]) * control_k[i];
+    target_w[4] = target_w[4] + (velocity_cmd.forward * velocity_cmd.forward_gain);
+    target_w[5] = velocity_cmd.forward * velocity_cmd.forward_gain;
+
+    // Limit max delta input
+    if ( target_w[4] > state_x[4] + M_PI * 2 ) {
+      target_w[4] = state_x[4] + M_PI * 2;
     }
 
+    if ( target_w[4] < state_x[4] - M_PI * 2 ) {
+      target_w[4] = state_x[4] - M_PI * 2;
+    }
+
+    motor_increment = 0;
+    for (int i = 0; i < 6; ++i){
+      motor_increment -= (state_x[i] - target_w[i]) * control_k[i];
+    }
+
+    velocity_lp = (velocity_lp + state_x[5]) / 2;
     auto current_stamp = ros_clock.now();
-    float pwm_target = state_x[5] + motor_increment * (main_loop + 0.02); // v = v_measurement + a * t
+    float pwm_target = velocity_lp + motor_increment * main_loop; // v = v_measurement + a * t
 
     float pwm_target_left =
-        pwm_target + (velocity_cmd.turn * velocity_cmd.turn_gain);
-    float pwm_target_right =
         pwm_target - (velocity_cmd.turn * velocity_cmd.turn_gain);
+    float pwm_target_right =
+        pwm_target + (velocity_cmd.turn * velocity_cmd.turn_gain);
 
     {
       auto msg = std::make_unique<balance_robot_msgs::msg::Balance>();
@@ -204,13 +217,12 @@ int main(int argc, char *argv[]) {
       msg->header.frame_id = "robot";
       msg->header.stamp = current_stamp;
 
-      msg->velocity.setpoint = 0;
-      msg->velocity.measurement = 0;
-      msg->velocity.increment = 0;
-
-      msg->roll.setpoint = 0;
-      msg->roll.measurement = 0;
-      msg->roll.increment = 0;
+      msg->roll.setpoint = state_x[0];
+      msg->roll.measurement = state_x[1];
+      msg->roll.increment = state_x[2];
+      msg->velocity.setpoint = state_x[3];
+      msg->velocity.measurement = state_x[4];
+      msg->velocity.increment = state_x[5];
 
       msg->motor = pwm_target;
       msg->motor_left = pwm_target_left;
@@ -225,8 +237,8 @@ int main(int argc, char *argv[]) {
       msg->header.frame_id = "robot";
       msg->header.stamp = current_stamp;
 
-      msg->motor1.setpoint = radToCpr(pwm_target_left);
-      msg->motor0.setpoint = radToCpr(pwm_target_right * -1);
+      msg->motor1.setpoint = radToCpr(pwm_target_left * -1);
+      msg->motor0.setpoint = radToCpr(pwm_target_right);
 
       motors_pub->publish(std::move(msg));
     }
