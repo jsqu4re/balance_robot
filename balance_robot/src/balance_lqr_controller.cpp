@@ -14,13 +14,12 @@
 #include <sys/time.h>
 #include <unistd.h>
 
-#include <balance_robot_msgs/msg/balance.hpp>
+#include <balance_robot_msgs/msg/states.hpp>
 #include <balance_robot_msgs/msg/encoders.hpp>
 #include <balance_robot_msgs/msg/motors.hpp>
 #include <balance_robot_msgs/msg/orientation.hpp>
 #include <sensor_msgs/msg/joy.hpp>
 
-#include <balance_robot/pid.h>
 
 struct vel_cmd {
   float forward;
@@ -141,8 +140,8 @@ int main(int argc, char *argv[]) {
 
   // std::thread listener_task(listener);
   rclcpp::QoS qos(rclcpp::KeepLast(10));
-  auto balance_pub = node->create_publisher<balance_robot_msgs::msg::Balance>(
-      "balance/controller", qos);
+  auto states_pub = node->create_publisher<balance_robot_msgs::msg::States>(
+      "balance/states", qos);
 
   auto motors_pub = node->create_publisher<balance_robot_msgs::msg::Motors>(
       "balance/motors", qos);
@@ -168,12 +167,12 @@ int main(int argc, char *argv[]) {
   auto callback_handler =
       parameters_client->on_parameter_event(param_change_callback);
 
-  float motor_increment = 0;
-  float velocity_lp = 0;
+  double motor_increment = 0;
+  double velocity_lp = 0;
 
-  float state_x [6] = {0, 0, 0, 0, 0, 0};
-  float target_w [6] = {0.1415, 0, 0, 0, 0, 0};
-  float control_k [6] = {-453.11421438, -41.03540067, 15.17484972, -6.16366411, -4.47213596, -4.30609058};
+  std::array<double, 6> state_x = {0, 0, 0, 0, 0, 0};
+  std::array<double, 6> target_w = {0.1415, 0, 0, 0, 0, 0};
+  std::array<double, 6> control_k = {-453.11421438, -41.03540067, 15.17484972, -6.16366411, -4.47213596, -4.30609058};
 
   rclcpp::Clock ros_clock(RCL_ROS_TIME);
 
@@ -212,23 +211,17 @@ int main(int argc, char *argv[]) {
         pwm_target + (velocity_cmd.turn * velocity_cmd.turn_gain);
 
     {
-      auto msg = std::make_unique<balance_robot_msgs::msg::Balance>();
+      auto msg = std::make_unique<balance_robot_msgs::msg::States>();
 
       msg->header.frame_id = "robot";
       msg->header.stamp = current_stamp;
 
-      msg->roll.setpoint = state_x[0];
-      msg->roll.measurement = state_x[1];
-      msg->roll.increment = state_x[2];
-      msg->velocity.setpoint = state_x[3];
-      msg->velocity.measurement = state_x[4];
-      msg->velocity.increment = state_x[5];
+      msg->x = state_x;
+      msg->w = target_w;
+      msg->k = control_k;
+      msg->u[0] = pwm_target;
 
-      msg->motor = pwm_target;
-      msg->motor_left = pwm_target_left;
-      msg->motor_right = pwm_target_right;
-
-      balance_pub->publish(std::move(msg));
+      states_pub->publish(std::move(msg));
     }
 
     {
