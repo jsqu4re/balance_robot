@@ -9,15 +9,21 @@ from launch import LaunchDescription  # noqa: E402
 from launch import LaunchIntrospector  # noqa: E402
 from launch import LaunchService  # noqa: E402
 
+import launch.actions  # noqa: E402
 import launch_ros.actions  # noqa: E402
 
-
 def generate_launch_description():
+
+    lqr_controller = launch_ros.actions.Node(package='balance_robot', executable='lqr_controller', output='screen', on_exit=launch.actions.Shutdown())
+    orientation = launch_ros.actions.Node(package='balance_robot', executable='orientation', arguments=['-i', 'lsm'], output='screen', on_exit=launch.actions.Shutdown())
+    motor_controller = launch_ros.actions.Node(package='balance_robot_py', executable='motor_controller', output='screen', on_exit=launch.actions.Shutdown())
+    serial_publisher = launch_ros.actions.Node(package='balance_robot_rpi', executable='serial_publisher', name='serial_publisher', output='screen', on_exit=launch.actions.Shutdown())
+
     return LaunchDescription([
-        launch_ros.actions.Node(package='balance_robot', executable='lqr_controller', output='screen'),
-        launch_ros.actions.Node(package='balance_robot', executable='orientation', arguments=['-i', 'lsm'], output='screen'),
-        launch_ros.actions.Node(package='balance_robot_py', executable='motor_controller', output='screen'),
-        launch_ros.actions.Node(package='balance_robot_rpi', executable='serial_publisher', output='screen'),
+        lqr_controller,
+        orientation,
+        motor_controller,
+        serial_publisher,
     ])
 
 def main(argv=sys.argv[1:]):
