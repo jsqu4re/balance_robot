@@ -21,6 +21,7 @@ setup(
     entry_points={
         'console_scripts': [
             'motor_controller = balance_robot_py.motor_controller:main',
+            'gain_changer = balance_robot_py.gain_changer:main',
             'xbox_controller = balance_robot_py.xbox_controller:main'
         ],
     },

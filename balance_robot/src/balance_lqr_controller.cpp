@@ -14,12 +14,12 @@
 #include <sys/time.h>
 #include <unistd.h>
 
-#include <balance_robot_msgs/msg/states.hpp>
 #include <balance_robot_msgs/msg/encoders.hpp>
+#include <balance_robot_msgs/msg/gains.hpp>
 #include <balance_robot_msgs/msg/motors.hpp>
 #include <balance_robot_msgs/msg/orientation.hpp>
+#include <balance_robot_msgs/msg/states.hpp>
 #include <sensor_msgs/msg/joy.hpp>
-
 
 struct vel_cmd {
   float forward;
@@ -57,6 +57,8 @@ struct inner_wheel {
 
 static float main_loop = 0.08;
 
+static std::array<double, 6> control_k = {-453.11421438, -41.03540067, 15.17484972, -6.16366411, -4.47213596, -4.30609058};
+
 static vel_cmd velocity_cmd{0, 0, 0.05, 3};
 
 static orientation orientation_imu_measurement{.0, .0, .0, .2};
@@ -71,6 +73,10 @@ static inner_wheel combined_inner_wheel{.0, .0};
 void joy_topic_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
   velocity_cmd.forward = msg->axes[1];
   velocity_cmd.turn = msg->axes[0];
+}
+
+void gains_topic_callback(const balance_robot_msgs::msg::Gains::SharedPtr msg) {
+  control_k = msg->k;
 }
 
 void orientation_imu_topic_callback(
@@ -161,6 +167,9 @@ int main(int argc, char *argv[]) {
       node->create_subscription<balance_robot_msgs::msg::Encoders>(
           "balance/encoders", 10, encoders_topic_callback);
 
+  auto gains_subscription = node->create_subscription<balance_robot_msgs::msg::Gains>(
+      "balance/gains", 10, gains_topic_callback);
+
   auto parameters_client =
       std::make_shared<rclcpp::AsyncParametersClient>(node);
 
@@ -172,7 +181,6 @@ int main(int argc, char *argv[]) {
 
   std::array<double, 6> state_x = {0, 0, 0, 0, 0, 0};
   std::array<double, 6> target_w = {0.1415, 0, 0, 0, 0, 0};
-  std::array<double, 6> control_k = {-453.11421438, -41.03540067, 15.17484972, -6.16366411, -4.47213596, -4.30609058};
 
   rclcpp::Clock ros_clock(RCL_ROS_TIME);
 
