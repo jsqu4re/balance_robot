@@ -6,6 +6,7 @@ from rclpy.executors import SingleThreadedExecutor
 from balance_robot_msgs.msg import Gains
 from balance_robot_msgs.msg import States
 
+import numpy as np
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.multioutput import MultiOutputRegressor
 
@@ -21,7 +22,17 @@ class GainChanger(Node):
         gains_msg = Gains()
         gains_msg.header.frame_id = "robot_base_frame"
         gains_msg.header.stamp = self.get_clock().now().to_msg()
-        gains_msg.k = self.regressor.predict(states_msg.x)
+        state_x = [
+            states_msg.x[0], # Calibration data
+            states_msg.x[1],
+            states_msg.x[2],
+            states_msg.x[3],
+            states_msg.x[4],
+            states_msg.x[5],
+            0  # abs(states_msg.x[2]) * 200
+        ]
+        gains_k = self.regressor.predict(np.array([state_x]))
+        gains_msg.k = gains_k[0]
         self.pub.publish(gains_msg)
 
 
@@ -29,8 +40,8 @@ def main(args=None):
     rclpy.init(args=args)
     try:
         gain_changer_node = GainChanger()
-
-        pkl_filename = "/home/pi/regressors/regressor_gains.pkl"
+        # fix absolute path
+        pkl_filename = "/home/jsqu4re/workspace/videte_robot/simple_videte_wheel/regressor_gains.pkl"
         with open(pkl_filename, 'rb') as file:
             gain_changer_node.regressor = pickle.load(file)
 
