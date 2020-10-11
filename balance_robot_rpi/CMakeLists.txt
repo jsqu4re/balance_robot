@@ -21,6 +21,7 @@ find_package(rclcpp REQUIRED)
 find_package(balance_robot_msgs REQUIRED)
 
 find_library(wiringPi_LIB wiringPi REQUIRED)
+find_package(Threads)
 
 add_executable(serial_test
   src/serial_test.cpp
@@ -33,6 +34,9 @@ target_include_directories(serial_test PUBLIC
 
 target_link_libraries(serial_test
   ${wiringPi_LIB}
+  ${CMAKE_THREAD_LIBS_INIT}
+  crypt
+  rt
 )
 
 install(TARGETS serial_test
@@ -52,6 +56,9 @@ ament_target_dependencies(serial_publisher
 
 target_link_libraries(serial_publisher
   ${wiringPi_LIB}
+  ${CMAKE_THREAD_LIBS_INIT}
+  crypt
+  rt
 )
 
 install(TARGETS serial_publisher
