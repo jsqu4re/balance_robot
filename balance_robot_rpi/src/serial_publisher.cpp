@@ -64,7 +64,7 @@ int main(int argc, char *argv[]) {
         if (!j.is_discarded()) {
           try {
             auto msg = std::make_unique<balance_robot_msgs::msg::Orientation>();
-            msg->header.frame_id = "outer_wheel";
+            msg->header.frame_id = j["frame"].get<std::string>();
             msg->header.stamp = ros_clock.now();
             // Add differential information
             msg->pitch = j["P"].get<double>();
