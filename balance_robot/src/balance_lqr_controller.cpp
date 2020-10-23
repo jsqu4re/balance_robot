@@ -126,7 +126,6 @@ void param_change_callback(
       velocity_cmd.forward_gain = parameter.value.double_value;
     if (parameter.name == "vel_cmd.turn_gain")
       velocity_cmd.turn_gain = parameter.value.double_value;
-
     if (parameter.name == "main_loop")
       main_loop = parameter.value.double_value;
   }
@@ -138,10 +137,8 @@ int main(int argc, char *argv[]) {
   rclcpp::init(argc, argv);
   auto node = rclcpp::Node::make_shared("balance_robot_controller");
   node->declare_parameter("vel_lowpass", vel_lowpass);
-
   node->declare_parameter("vel_cmd.forward_gain", velocity_cmd.forward_gain);
   node->declare_parameter("vel_cmd.turn_gain", velocity_cmd.turn_gain);
-
   node->declare_parameter("main_loop", main_loop);
 
   // std::thread listener_task(listener);
@@ -180,13 +177,13 @@ int main(int argc, char *argv[]) {
   double velocity_lp = 0;
 
   std::array<double, 6> state_x = {0, 0, 0, 0, 0, 0};
-  std::array<double, 6> target_w = {0.1415, 0, 0, 0, 0, 0};
+  std::array<double, 6> target_w = {-0.1415, 0, 0, 0, 0, 0};
 
   rclcpp::Clock ros_clock(RCL_ROS_TIME);
 
   while (rclcpp::ok()) {
-    state_x[0] = orientation_imu_measurement.roll;
-    state_x[1] = orientation_imu_measurement.d_roll;
+    state_x[0] = orientation_imu_measurement.pitch;
+    state_x[1] = orientation_imu_measurement.d_pitch;
     state_x[2] = -1 * orientation_ow_measurement.pitch;
     state_x[3] = -1 * orientation_ow_measurement.d_pitch;
     state_x[4] = combined_inner_wheel.position;
