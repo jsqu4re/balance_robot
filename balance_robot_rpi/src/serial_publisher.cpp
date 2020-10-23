@@ -32,17 +32,24 @@ int open_serial(std::string sensor_port) {
 }
 
 int main(int argc, char *argv[]) {
+  std::string device_name = argv[1];
+  if (device_name == "") {
+    device_name = "/dev/ttyACM0";
+  }
+
   rclcpp::init(argc, argv);
   rclcpp::Clock ros_clock(RCL_ROS_TIME);
 
   auto node = rclcpp::Node::make_shared("serial_publisher_ow");
-  auto publisher = node->create_publisher<balance_robot_msgs::msg::Orientation>(
+  auto publisher_body = node->create_publisher<balance_robot_msgs::msg::Orientation>(
+      "balance/orientation/imu", 10);
+  auto publisher_wheel = node->create_publisher<balance_robot_msgs::msg::Orientation>(
       "balance/orientation/ow", 10);
 
   int sensor = -1;
   while(sensor < 0){
-	sensor = open_serial("/dev/ttyACM0");
-	rclcpp::spin_some(node);
+    sensor = open_serial(device_name);
+    rclcpp::spin_some(node);
   };
 
   wiringPiSetup();
@@ -76,7 +83,11 @@ int main(int argc, char *argv[]) {
             if (j["f"] > 0) {
               msg->dt = 1. / j["f"].get<double>();
             }
-            publisher->publish(std::move(msg));
+            if (msg->header.frame_id == "body") {
+              publisher_body->publish(std::move(msg));
+            } else {
+              publisher_wheel->publish(std::move(msg));
+            }
           } catch (const std::exception &e) {
             std::cout << combined << std::endl;
           }
