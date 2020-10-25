@@ -57,12 +57,14 @@ struct inner_wheel {
 
 static float main_loop = 0.08;
 
-static std::array<double, 6> control_k = {-453.11421438, -41.03540067, 15.17484972, -6.16366411, -4.47213596, -4.30609058};
+static std::array<double, 6> control_k = {-467.79730132, -42.88097678, 15.94971425, -6.14649532, -4.47213596, -4.3158712};
+// −311.753349248838, −28.670137694416, 46.020894063272, −0.69701467630523, −4.47213596519255, −2.94092932828381
+static std::array<double, 6> calibration = {0, 0, 0, 0, 0, 0};
 
 static vel_cmd velocity_cmd{0, 0, 0.05, 3};
 
-static orientation orientation_imu_measurement{.0, .0, .0, .2};
-static orientation orientation_ow_measurement{.0, .0, .0, .2};
+static orientation orientation_imu_measurement{.0, .0, .0, .0, .0, .0, .2};
+static orientation orientation_ow_measurement{.0, .0, .0, .0, .0, .0, .2};
 static encoders encoders_measurement{.0, .0, .0, .0};
 
 static float vel_lowpass{20};
@@ -77,6 +79,10 @@ void joy_topic_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
 
 void gains_topic_callback(const balance_robot_msgs::msg::Gains::SharedPtr msg) {
   control_k = msg->k;
+}
+
+void calibration_topic_callback(const balance_robot_msgs::msg::Gains::SharedPtr msg) {
+  calibration = msg->k;
 }
 
 void orientation_imu_topic_callback(
@@ -167,6 +173,9 @@ int main(int argc, char *argv[]) {
   auto gains_subscription = node->create_subscription<balance_robot_msgs::msg::Gains>(
       "balance/gains", 10, gains_topic_callback);
 
+  auto calibration_subscription = node->create_subscription<balance_robot_msgs::msg::Gains>(
+      "balance/calibration", 10, calibration_topic_callback);
+
   auto parameters_client =
       std::make_shared<rclcpp::AsyncParametersClient>(node);
 
@@ -177,28 +186,28 @@ int main(int argc, char *argv[]) {
   double velocity_lp = 0;
 
   std::array<double, 6> state_x = {0, 0, 0, 0, 0, 0};
-  std::array<double, 6> target_w = {-0.1415, 0, 0, 0, 0, 0};
+  std::array<double, 6> target_w = {0, 0, 0, 0, 0, 0};
 
   rclcpp::Clock ros_clock(RCL_ROS_TIME);
 
   while (rclcpp::ok()) {
-    state_x[0] = orientation_imu_measurement.pitch;
-    state_x[1] = orientation_imu_measurement.d_pitch;
-    state_x[2] = -1 * orientation_ow_measurement.pitch;
-    state_x[3] = -1 * orientation_ow_measurement.d_pitch;
-    state_x[4] = combined_inner_wheel.position;
-    state_x[5] = combined_inner_wheel.velocity;
+    state_x[0] = -1 * orientation_imu_measurement.pitch + calibration[0];
+    state_x[1] = -1 * orientation_imu_measurement.d_pitch + calibration[1];
+    state_x[2] = orientation_ow_measurement.pitch + calibration[2];
+    state_x[3] = orientation_ow_measurement.d_pitch + calibration[3];
+    state_x[4] = combined_inner_wheel.position + calibration[4];
+    state_x[5] = combined_inner_wheel.velocity + calibration[5];
 
     target_w[4] = target_w[4] + (velocity_cmd.forward * velocity_cmd.forward_gain);
     target_w[5] = velocity_cmd.forward * velocity_cmd.forward_gain;
 
     // Limit max delta input
-    if ( target_w[4] > state_x[4] + M_PI * 2 ) {
-      target_w[4] = state_x[4] + M_PI * 2;
+    if ( target_w[4] > state_x[4] + M_PI * 5 ) {
+      target_w[4] = state_x[4] + M_PI * 5;
     }
 
-    if ( target_w[4] < state_x[4] - M_PI * 2 ) {
-      target_w[4] = state_x[4] - M_PI * 2;
+    if ( target_w[4] < state_x[4] - M_PI * 5 ) {
+      target_w[4] = state_x[4] - M_PI * 5;
     }
 
     motor_increment = 0;
