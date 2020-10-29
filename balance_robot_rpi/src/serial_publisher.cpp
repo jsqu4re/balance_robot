@@ -23,7 +23,7 @@ using json = nlohmann::json;
 
 int open_serial(std::string sensor_port) {
   try {
-    return serialOpen(sensor_port.c_str(), 9600);
+    return serialOpen(sensor_port.c_str(), 115200);
   } catch (const std::exception &e) {
 	std::cerr << "Error opening serial port" << std::endl;
 	sleep(1);
@@ -80,9 +80,7 @@ int main(int argc, char *argv[]) {
             msg->d_pitch = j["dP"].get<double>();
             msg->d_roll = j["dR"].get<double>();
             msg->d_yaw = j["dY"].get<double>();
-            if (j["f"] > 0) {
-              msg->dt = 1. / j["f"].get<double>();
-            }
+            msg->dt = j["dt"].get<double>();
             if (msg->header.frame_id == "body") {
               publisher_body->publish(std::move(msg));
             } else {
@@ -98,7 +96,7 @@ int main(int argc, char *argv[]) {
       }
     }
     rclcpp::spin_some(node);
-	sleep(0.1);
+	sleep(0.05);
   }
   rclcpp::shutdown();
   return 0;

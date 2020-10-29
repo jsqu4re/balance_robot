@@ -13,7 +13,7 @@ class XboxController(Node):
         self.pub = self.create_publisher(Motors, 'balance/motors', 10)
 
     def xbox_callback(self, joy_msg):
-        self.get_logger().info("hello world")
+        self.get_logger().info("No output set")
 
         motors_msg = Motors()
         motors_msg.header.frame_id = "robot_base_frame"

@@ -184,7 +184,8 @@ def main(args=None):
         executor = SingleThreadedExecutor()
         executor.add_node(manager_node)
         executor.add_node(controller_node)
-        executor.add_node(encoder_node)
+        # FIXME: Please!
+        # executor.add_node(encoder_node)
 
         try:
             executor.spin()

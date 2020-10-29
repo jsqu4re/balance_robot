@@ -217,7 +217,8 @@ int main(int argc, char *argv[]) {
 
     velocity_lp = (velocity_lp + state_x[5]) / 2;
     auto current_stamp = ros_clock.now();
-    float pwm_target = velocity_lp + motor_increment * main_loop; // v = v_measurement + a * t
+    // FIXME: needs to be fixed
+    float pwm_target = velocity_lp + motor_increment * 5; // main_loop; // v = v_measurement + a * t
 
     float pwm_target_left =
         pwm_target - (velocity_cmd.turn * velocity_cmd.turn_gain);
@@ -250,6 +251,6 @@ int main(int argc, char *argv[]) {
       motors_pub->publish(std::move(msg));
     }
     rclcpp::spin_some(node);
-    sleep(main_loop);
+    usleep(5000); // fix timing
   }
 }
