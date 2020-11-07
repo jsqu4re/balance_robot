@@ -7,7 +7,7 @@ from odrive.enums import *
 import rclpy
 from rclpy.node import Node
 from rclpy.exceptions import ParameterNotDeclaredException
-from rclpy.executors import SingleThreadedExecutor
+from rclpy.executors import MultiThreadedExecutor
 
 from balance_robot_msgs.msg import Encoders
 from balance_robot_msgs.msg import Motors
@@ -99,13 +99,6 @@ class OdriveMotorManager(Node):
             self.current_state = State.Control
 
         if self.target_state < self.current_state:
-            if self.target_state <= State.Control:
-                try:
-                    self.balance_odrive.axis0.controller.vel_setpoint = 0.0
-                    self.balance_odrive.axis1.controller.vel_setpoint = 0.0
-                except Exception as err:
-                    self.get_logger().error("failed to send stop command to balance odrive: " + str(err))
-
             if self.target_state <= State.Calibrated:
                 try:
                     self.balance_odrive.axis0.requested_state = AXIS_STATE_IDLE
@@ -137,30 +130,31 @@ class OdriveMotorManager(Node):
 class OdriveMotorController(Node):
     def __init__(self, manager):
         super().__init__('odrive_motor_controller')
-        self.sub = self.create_subscription(Motors, 'balance/motors', self.motors_callback, 10)
         self.manager = manager
+        self.sub = self.create_subscription(Motors, 'balance/motors', self.motors_callback, 10)
+        self.pub = self.create_publisher(Encoders, 'balance/encoders', 10)
+        timer_period = 0.06  # seconds
+        self.timer = self.create_timer(timer_period, self.timer_callback)
+        self.motor0_vel = .0
+        self.motor1_vel = .0
 
     def motors_callback(self, msg):
-        if self.manager.current_state == State.Control:
-            try:
-                self.manager.balance_odrive.axis0.controller.vel_setpoint = msg.motor0.setpoint
-                self.manager.balance_odrive.axis1.controller.vel_setpoint = msg.motor1.setpoint
-            except Exception as err:
-                self.get_logger().error("failed to send data to balance odrive: " + str(err) + " .. restarting odrive")
-                self.manager.target_state = State.Init
+        self.motor0_vel = msg.motor0.setpoint
+        self.motor1_vel = msg.motor1.setpoint
+        # self.get_logger().info("Update velocity: " + str(self.motor0_vel) + ", " + str(self.motor1_vel))
 
-class OdriveMotorEncoder(Node):
-    def __init__(self, manager):
-        super().__init__('odrive_motor_encoders')
-        self.manager = manager
-        self.publisher_ = self.create_publisher(Encoders, 'balance/encoders', 10)
-        timer_period = 0.1  # seconds
-        self.timer = self.create_timer(timer_period, self.timer_callback)
-        self.i = 0
 
     def timer_callback(self):
         if self.manager.current_state >= State.Ready:
             try:
+                if self.manager.current_state == State.Control:
+                    self.get_logger().info("Set velocity: " + str(self.motor0_vel) + ", " + str(self.motor1_vel))
+                    self.manager.balance_odrive.axis0.controller.vel_setpoint = self.motor0_vel
+                    self.manager.balance_odrive.axis1.controller.vel_setpoint = self.motor1_vel
+                else:
+                    self.manager.balance_odrive.axis0.controller.vel_setpoint = .0
+                    self.manager.balance_odrive.axis1.controller.vel_setpoint = .0
+
                 msg = Encoders()
                 msg.header.frame_id = "robot_base_frame"
                 msg.header.stamp = self.get_clock().now().to_msg()
@@ -168,9 +162,9 @@ class OdriveMotorEncoder(Node):
                 msg.encoder1.position = self.manager.balance_odrive.axis1.encoder.pos_estimate
                 msg.encoder0.velocity = self.manager.balance_odrive.axis0.encoder.vel_estimate
                 msg.encoder1.velocity = self.manager.balance_odrive.axis1.encoder.vel_estimate
-                self.publisher_.publish(msg)
+                self.pub.publish(msg)
             except Exception as err:
-                self.get_logger().error("failed to receive data from balance odrive: " + str(err) + " .. restarting odrive")
+                self.get_logger().error("failed to send or receive data from balance odrive: " + str(err) + " .. restarting odrive")
                 self.manager.target_state = State.Init
 
 def main(args=None):
@@ -179,13 +173,10 @@ def main(args=None):
     try:
         manager_node = OdriveMotorManager()
         controller_node = OdriveMotorController(manager_node)
-        encoder_node = OdriveMotorEncoder(manager_node)
     
-        executor = SingleThreadedExecutor()
+        executor = MultiThreadedExecutor()
         executor.add_node(manager_node)
         executor.add_node(controller_node)
-        # FIXME: Please!
-        # executor.add_node(encoder_node)
 
         try:
             executor.spin()
@@ -193,7 +184,6 @@ def main(args=None):
             executor.shutdown()
             manager_node.destroy_node()
             controller_node.destroy_node()
-            encoder_node.destroy_node()
     finally:
         rclpy.shutdown()
 

@@ -69,7 +69,6 @@ static encoders encoders_measurement{.0, .0, .0, .0};
 
 static float vel_lowpass{20};
 
-static wheel_position motor_position{.0, .0};
 static inner_wheel combined_inner_wheel{.0, .0};
 
 void joy_topic_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
@@ -215,10 +214,10 @@ int main(int argc, char *argv[]) {
       motor_increment -= (state_x[i] - target_w[i]) * control_k[i];
     }
 
-    velocity_lp = (velocity_lp + state_x[5]) / 2;
+    velocity_lp = (velocity_lp - state_x[5]) / 2;
     auto current_stamp = ros_clock.now();
     // FIXME: needs to be fixed
-    float pwm_target = velocity_lp + motor_increment * 5; // main_loop; // v = v_measurement + a * t
+    float pwm_target = velocity_lp + motor_increment * 0.1; // main_loop; // v = v_measurement + a * t
 
     float pwm_target_left =
         pwm_target - (velocity_cmd.turn * velocity_cmd.turn_gain);
