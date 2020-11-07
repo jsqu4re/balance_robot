@@ -155,25 +155,25 @@ int main(int argc, char *argv[]) {
       "balance/motors", qos);
 
   auto joy_subscription = node->create_subscription<sensor_msgs::msg::Joy>(
-      "joy", 10, joy_topic_callback);
+      "joy", 1, joy_topic_callback);
 
   auto orientation_imu_subscription =
       node->create_subscription<balance_robot_msgs::msg::Orientation>(
-          "balance/orientation/imu", 10, orientation_imu_topic_callback);
+          "balance/orientation/imu", 1, orientation_imu_topic_callback);
 
   auto orientation_ow_subscription =
       node->create_subscription<balance_robot_msgs::msg::Orientation>(
-          "balance/orientation/ow", 10, orientation_ow_topic_callback);
+          "balance/orientation/ow", 1, orientation_ow_topic_callback);
 
   auto encoders_subscription =
       node->create_subscription<balance_robot_msgs::msg::Encoders>(
-          "balance/encoders", 10, encoders_topic_callback);
+          "balance/encoders", 1, encoders_topic_callback);
 
   auto gains_subscription = node->create_subscription<balance_robot_msgs::msg::Gains>(
-      "balance/gains", 10, gains_topic_callback);
+      "balance/gains", 1, gains_topic_callback);
 
   auto calibration_subscription = node->create_subscription<balance_robot_msgs::msg::Gains>(
-      "balance/calibration", 10, calibration_topic_callback);
+      "balance/calibration", 1, calibration_topic_callback);
 
   auto parameters_client =
       std::make_shared<rclcpp::AsyncParametersClient>(node);
@@ -182,18 +182,18 @@ int main(int argc, char *argv[]) {
       parameters_client->on_parameter_event(param_change_callback);
 
   double motor_increment = 0;
-  double velocity_lp = 0;
 
   std::array<double, 6> state_x = {0, 0, 0, 0, 0, 0};
   std::array<double, 6> target_w = {0, 0, 0, 0, 0, 0};
+  std::array<double, 6> state_x_lp = {0, 0, 0, 0, 0, 0};
 
   rclcpp::Clock ros_clock(RCL_ROS_TIME);
 
   while (rclcpp::ok()) {
     state_x[0] = -1 * orientation_imu_measurement.pitch + calibration[0];
     state_x[1] = -1 * orientation_imu_measurement.d_pitch + calibration[1];
-    state_x[2] = orientation_ow_measurement.pitch + calibration[2];
-    state_x[3] = orientation_ow_measurement.d_pitch + calibration[3];
+    state_x[2] = -1 * orientation_ow_measurement.pitch + calibration[2];
+    state_x[3] = -1 * orientation_ow_measurement.d_pitch + calibration[3];
     state_x[4] = combined_inner_wheel.position + calibration[4];
     state_x[5] = combined_inner_wheel.velocity + calibration[5];
 
@@ -210,14 +210,15 @@ int main(int argc, char *argv[]) {
     }
 
     motor_increment = 0;
+
     for (int i = 0; i < 6; ++i){
       motor_increment -= (state_x[i] - target_w[i]) * control_k[i];
+      state_x_lp[i] = (2 * state_x_lp[i] + state_x[i]) / 3;
     }
 
-    velocity_lp = (velocity_lp - state_x[5]) / 2;
     auto current_stamp = ros_clock.now();
     // FIXME: needs to be fixed
-    float pwm_target = velocity_lp + motor_increment * 0.1; // main_loop; // v = v_measurement + a * t
+    float pwm_target = state_x_lp[5] + motor_increment * 0.08; // main_loop; // v = v_measurement + a * t
 
     float pwm_target_left =
         pwm_target - (velocity_cmd.turn * velocity_cmd.turn_gain);
@@ -231,6 +232,8 @@ int main(int argc, char *argv[]) {
       msg->header.stamp = current_stamp;
 
       msg->x = state_x;
+      msg->lp_x = state_x_lp;
+      msg->c = calibration;
       msg->w = target_w;
       msg->k = control_k;
       msg->u[0] = pwm_target;
@@ -250,6 +253,6 @@ int main(int argc, char *argv[]) {
       motors_pub->publish(std::move(msg));
     }
     rclcpp::spin_some(node);
-    usleep(5000); // fix timing
+    usleep(10000);
   }
 }

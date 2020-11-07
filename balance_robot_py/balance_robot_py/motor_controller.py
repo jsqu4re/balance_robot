@@ -131,9 +131,9 @@ class OdriveMotorController(Node):
     def __init__(self, manager):
         super().__init__('odrive_motor_controller')
         self.manager = manager
-        self.sub = self.create_subscription(Motors, 'balance/motors', self.motors_callback, 10)
+        self.sub = self.create_subscription(Motors, 'balance/motors', self.motors_callback, 1)
         self.pub = self.create_publisher(Encoders, 'balance/encoders', 10)
-        timer_period = 0.06  # seconds
+        timer_period = 0.08  # seconds
         self.timer = self.create_timer(timer_period, self.timer_callback)
         self.motor0_vel = .0
         self.motor1_vel = .0
@@ -141,14 +141,11 @@ class OdriveMotorController(Node):
     def motors_callback(self, msg):
         self.motor0_vel = msg.motor0.setpoint
         self.motor1_vel = msg.motor1.setpoint
-        # self.get_logger().info("Update velocity: " + str(self.motor0_vel) + ", " + str(self.motor1_vel))
-
 
     def timer_callback(self):
         if self.manager.current_state >= State.Ready:
             try:
                 if self.manager.current_state == State.Control:
-                    self.get_logger().info("Set velocity: " + str(self.motor0_vel) + ", " + str(self.motor1_vel))
                     self.manager.balance_odrive.axis0.controller.vel_setpoint = self.motor0_vel
                     self.manager.balance_odrive.axis1.controller.vel_setpoint = self.motor1_vel
                 else:
@@ -163,6 +160,7 @@ class OdriveMotorController(Node):
                 msg.encoder0.velocity = self.manager.balance_odrive.axis0.encoder.vel_estimate
                 msg.encoder1.velocity = self.manager.balance_odrive.axis1.encoder.vel_estimate
                 self.pub.publish(msg)
+
             except Exception as err:
                 self.get_logger().error("failed to send or receive data from balance odrive: " + str(err) + " .. restarting odrive")
                 self.manager.target_state = State.Init
@@ -186,8 +184,6 @@ def main(args=None):
             controller_node.destroy_node()
     finally:
         rclpy.shutdown()
-
-
 
 if __name__ == '__main__':
     main()

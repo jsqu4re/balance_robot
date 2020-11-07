@@ -9,7 +9,7 @@ from sensor_msgs.msg import Joy
 class XboxController(Node):
     def __init__(self):
         super().__init__('xbox_controller')
-        self.sub = self.create_subscription(Joy, 'joy', self.xbox_callback, 10)
+        self.sub = self.create_subscription(Joy, 'joy', self.xbox_callback, 1)
         self.pub = self.create_publisher(Motors, 'balance/motors', 10)
 
     def xbox_callback(self, joy_msg):

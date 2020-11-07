@@ -15,7 +15,7 @@ import pickle
 class GainChanger(Node):
     def __init__(self):
         super().__init__('gain_changer')
-        self.sub = self.create_subscription(States, 'balance/states', self.states_callback, 10)
+        self.sub = self.create_subscription(States, 'balance/states', self.states_callback, 1)
         self.pub = self.create_publisher(Gains, 'balance/gains', 10)
 
     def states_callback(self, states_msg):
