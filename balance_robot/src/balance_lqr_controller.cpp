@@ -217,8 +217,9 @@ int main(int argc, char *argv[]) {
     }
 
     auto current_stamp = ros_clock.now();
-    // FIXME: needs to be fixed
-    float pwm_target = state_x_lp[5] + motor_increment * 0.08; // main_loop; // v = v_measurement + a * t
+    // FIXME: needs to be fixed - velocity estimation seems to be bad
+    // float pwm_target = state_x_lp[5] + motor_increment * 0.08; // main_loop; // v = v_measurement + a * t
+    float pwm_target = motor_increment * 0.078//  + state_x[5]; // main_loop; // v = v_measurement + a * t
 
     float pwm_target_left =
         pwm_target - (velocity_cmd.turn * velocity_cmd.turn_gain);
