@@ -53,6 +53,7 @@ struct wheel_position {
 struct inner_wheel {
   float position;
   float velocity;
+  bool reset;
 };
 
 static float main_loop = 0.08;
@@ -116,10 +117,18 @@ double radToCpr(double rad_value) {
 
 void encoders_topic_callback(
     const balance_robot_msgs::msg::Encoders::SharedPtr msg) {
-  encoders_measurement.position_left = cprToRad(msg->encoder1.position * -1); // FIXME: This is not sufficient to change motor direction
-  encoders_measurement.position_right = cprToRad(msg->encoder0.position);
-  encoders_measurement.velocity_left = cprToRad(msg->encoder1.velocity * -1);
-  encoders_measurement.velocity_right = cprToRad(msg->encoder0.velocity);
+  if (combined_inner_wheel.reset) {
+    encoders_measurement.position_left = cprToRad(msg->encoder1.position * -1); // FIXME: This is not sufficient to change motor direction
+    encoders_measurement.position_right = cprToRad(msg->encoder0.position);
+    encoders_measurement.velocity_left = cprToRad(msg->encoder1.velocity * -1);
+    encoders_measurement.velocity_right = cprToRad(msg->encoder0.velocity);
+    combined_inner_wheel.reset = false;
+  } else {
+    encoders_measurement.position_left = (encoders_measurement.position_left + cprToRad(msg->encoder1.position * -1)) / 2; // FIXME: This is not sufficient to change motor direction
+    encoders_measurement.position_right = (encoders_measurement.position_right + cprToRad(msg->encoder0.position)) / 2;
+    encoders_measurement.velocity_left = (encoders_measurement.velocity_left + cprToRad(msg->encoder1.velocity * -1)) / 2;
+    encoders_measurement.velocity_right = (encoders_measurement.velocity_right + cprToRad(msg->encoder0.velocity)) / 2;
+  }
   combined_inner_wheel.position = encoders_measurement.position_right;
   combined_inner_wheel.velocity = (encoders_measurement.velocity_right + encoders_measurement.velocity_left) / 2;
 }
@@ -196,6 +205,7 @@ int main(int argc, char *argv[]) {
     state_x[3] = -1 * orientation_ow_measurement.d_pitch + calibration[3];
     state_x[4] = combined_inner_wheel.position + calibration[4];
     state_x[5] = combined_inner_wheel.velocity + calibration[5];
+    combined_inner_wheel.reset = true;
 
     target_w[4] = target_w[4] + (velocity_cmd.forward * velocity_cmd.forward_gain);
     target_w[5] = velocity_cmd.forward * velocity_cmd.forward_gain;
@@ -219,7 +229,7 @@ int main(int argc, char *argv[]) {
     auto current_stamp = ros_clock.now();
     // FIXME: needs to be fixed - velocity estimation seems to be bad
     // float pwm_target = state_x_lp[5] + motor_increment * 0.08; // main_loop; // v = v_measurement + a * t
-    float pwm_target = motor_increment * 0.078//  + state_x[5]; // main_loop; // v = v_measurement + a * t
+    float pwm_target = motor_increment * 0.078;//  + state_x[5]; // main_loop; // v = v_measurement + a * t
 
     float pwm_target_left =
         pwm_target - (velocity_cmd.turn * velocity_cmd.turn_gain);
