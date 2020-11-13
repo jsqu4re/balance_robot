@@ -133,7 +133,7 @@ class OdriveMotorController(Node):
         self.manager = manager
         self.sub = self.create_subscription(Motors, 'balance/motors', self.motors_callback, 1)
         self.pub = self.create_publisher(Encoders, 'balance/encoders', 10)
-        timer_period = 0.08  # seconds
+        timer_period = 0.02  # seconds
         self.timer = self.create_timer(timer_period, self.timer_callback)
         self.motor0_vel = .0
         self.motor1_vel = .0
@@ -145,6 +145,7 @@ class OdriveMotorController(Node):
     def timer_callback(self):
         if self.manager.current_state >= State.Ready:
             try:
+                start_time = self.get_clock().now()
                 if self.manager.current_state == State.Control:
                     self.manager.balance_odrive.axis0.controller.vel_setpoint = self.motor0_vel
                     self.manager.balance_odrive.axis1.controller.vel_setpoint = self.motor1_vel
@@ -154,11 +155,12 @@ class OdriveMotorController(Node):
 
                 msg = Encoders()
                 msg.header.frame_id = "robot_base_frame"
-                msg.header.stamp = self.get_clock().now().to_msg()
+                msg.header.stamp = start_time.to_msg()
                 msg.encoder0.position = self.manager.balance_odrive.axis0.encoder.pos_estimate
                 msg.encoder1.position = self.manager.balance_odrive.axis1.encoder.pos_estimate
                 msg.encoder0.velocity = self.manager.balance_odrive.axis0.encoder.vel_estimate
                 msg.encoder1.velocity = self.manager.balance_odrive.axis1.encoder.vel_estimate
+                msg.dt = (self.get_clock().now() - start_time).nanoseconds / 1000000.0
                 self.pub.publish(msg)
 
             except Exception as err:
