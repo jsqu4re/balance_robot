@@ -70,7 +70,7 @@ static encoders encoders_measurement{.0, .0, .0, .0};
 
 static float vel_lowpass{20};
 
-static inner_wheel combined_inner_wheel{.0, .0};
+static inner_wheel combined_inner_wheel{.0, .0, true};
 
 void joy_topic_callback(const sensor_msgs::msg::Joy::SharedPtr msg) {
   velocity_cmd.forward = msg->axes[1];
