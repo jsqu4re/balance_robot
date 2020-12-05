@@ -145,7 +145,7 @@ class OdriveMotorController(Node):
         self.manager = manager
         self.sub = self.create_subscription(MotorControl, 'balance/motors', self.motors_callback, 1)
         self.pub = self.create_publisher(Encoders, 'balance/encoders', 10)
-        self.timer_period = 0.02  # seconds
+        self.timer_period = 0.05  # seconds
         self.timer = self.create_timer(self.timer_period, self.timer_callback)
         self.motor_acc = .0
         self.motor_acc_updated = False
@@ -172,13 +172,13 @@ class OdriveMotorController(Node):
                 vel_diff_1 = self.tar_vel_1 - vel_1
 
                 if self.motor_acc_updated:
-                    self.tar_vel_0 = vel_0 + self.motor_acc * self.timer_period # + self.motor_vel_turn
-                    self.tar_vel_1 = vel_1 - self.motor_acc * self.timer_period # + self.motor_vel_turn
+                    self.tar_vel_0 =  +1 * self.motor_acc * self.timer_period # + self.motor_vel_turn + vel_0
+                    self.tar_vel_1 =  -1 * self.motor_acc * self.timer_period # + self.motor_vel_turn + vel_1
                     self.motor_acc_updated = False
 
                 if self.manager.current_state == State.Control:
-                    self.manager.balance_odrive.axis0.controller.vel_setpoint = self.tar_vel_0
-                    self.manager.balance_odrive.axis1.controller.vel_setpoint = self.tar_vel_1
+                    self.manager.balance_odrive.axis0.controller.vel_setpoint = self.tar_vel_0 + vel_diff_0
+                    self.manager.balance_odrive.axis1.controller.vel_setpoint = self.tar_vel_1 + vel_diff_1
                 else:
                     self.manager.balance_odrive.axis0.controller.vel_setpoint = .0
                     self.manager.balance_odrive.axis1.controller.vel_setpoint = .0

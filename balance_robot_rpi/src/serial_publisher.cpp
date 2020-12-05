@@ -96,7 +96,7 @@ int main(int argc, char *argv[]) {
       }
     }
     rclcpp::spin_some(node);
-	sleep(0.05);
+	sleep(0.005);
   }
   rclcpp::shutdown();
   return 0;
