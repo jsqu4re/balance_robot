@@ -36,9 +36,13 @@ class OdriveMotorManager(Node):
         timer_period = 2  # seconds
         self.timer = self.create_timer(timer_period, self.timer_callback)
         self.declare_parameter("target_state", State.Ready)
+        self.target_state = State.Init
         self.declare_parameter("current_state", State.Init)
         self.current_state = State.Init
-        self.target_state = State.Init
+        self.declare_parameter("pid_p", 0.3)
+        self.motor_pid_p = .0
+        self.declare_parameter("pid_i", 0.1)
+        self.motor_pid_i = .0
 
     def init_odrive(self):
         find_timeout = 20
@@ -51,6 +55,9 @@ class OdriveMotorManager(Node):
             self.get_logger().error("failed to find balance odrive .. sleep for " + str(find_timeout) + " seconds and retry")
             self.get_logger().error(str(err))
             time.sleep(find_timeout)
+
+    def reboot_odrive(self):
+        self.balance_odrive.reboot()
 
     def timer_callback(self):
         if self.current_state != self.target_state:
@@ -129,6 +136,8 @@ class OdriveMotorManager(Node):
             self.current_state = self.target_state
 
         self.target_state = self.get_parameter("target_state").get_parameter_value().integer_value
+        self.motor_pid_p = self.get_parameter("pid_p").get_parameter_value().double_value
+        self.motor_pid_i = self.get_parameter("pid_i").get_parameter_value().double_value
 
         current_state_param = rclpy.parameter.Parameter(
             "current_state",
@@ -145,13 +154,15 @@ class OdriveMotorController(Node):
         self.manager = manager
         self.sub = self.create_subscription(MotorControl, 'balance/motors', self.motors_callback, 1)
         self.pub = self.create_publisher(Encoders, 'balance/encoders', 10)
-        self.timer_period = 0.05  # seconds
+        self.timer_period = 0.04  # seconds
         self.timer = self.create_timer(self.timer_period, self.timer_callback)
         self.motor_acc = .0
         self.motor_acc_updated = False
         self.motor_vel_turn = .0
         self.tar_vel_0 = .0
         self.tar_vel_1 = .0
+        self.integral_vel_diff_0 = 0
+        self.integral_vel_diff_1 = 0
 
     def motors_callback(self, msg):
         self.motor_acc = msg.acceleration
@@ -171,17 +182,27 @@ class OdriveMotorController(Node):
                 vel_diff_0 = self.tar_vel_0 - vel_0
                 vel_diff_1 = self.tar_vel_1 - vel_1
 
-                if self.motor_acc_updated:
-                    self.tar_vel_0 =  +1 * self.motor_acc * self.timer_period # + self.motor_vel_turn + vel_0
-                    self.tar_vel_1 =  -1 * self.motor_acc * self.timer_period # + self.motor_vel_turn + vel_1
-                    self.motor_acc_updated = False
+                self.integral_vel_diff_0 += (vel_diff_0 + self.integral_vel_diff_0) / 2
+                self.integral_vel_diff_1 += (vel_diff_1 + self.integral_vel_diff_1) / 2
+
+                average_vel = (vel_0 - vel_1) / 2
+
+                # if self.motor_acc_updated:
+                self.tar_vel_0 =  +1.0 * self.motor_acc * self.timer_period + average_vel # + self.motor_vel_turn + vel_0
+                self.tar_vel_1 =  -1.0 * self.motor_acc * self.timer_period - average_vel # + self.motor_vel_turn + vel_1
+                    # self.motor_acc_updated = False
+                
+                targeted_vel_0 = self.tar_vel_0 + vel_diff_0 * self.manager.motor_pid_p + self.integral_vel_diff_0 * self.manager.motor_pid_i
+                targeted_vel_1 = self.tar_vel_1 + vel_diff_1 * self.manager.motor_pid_p + self.integral_vel_diff_1 * self.manager.motor_pid_i
 
                 if self.manager.current_state == State.Control:
-                    self.manager.balance_odrive.axis0.controller.vel_setpoint = self.tar_vel_0 + vel_diff_0
-                    self.manager.balance_odrive.axis1.controller.vel_setpoint = self.tar_vel_1 + vel_diff_1
+                    self.manager.balance_odrive.axis0.controller.vel_setpoint = targeted_vel_0
+                    self.manager.balance_odrive.axis1.controller.vel_setpoint = targeted_vel_1
                 else:
                     self.manager.balance_odrive.axis0.controller.vel_setpoint = .0
                     self.manager.balance_odrive.axis1.controller.vel_setpoint = .0
+                    self.integral_vel_diff_0 = .0
+                    self.integral_vel_diff_1 = .0
 
                 msg = Encoders()
                 msg.header.frame_id = "robot_base_frame"
@@ -192,6 +213,8 @@ class OdriveMotorController(Node):
                 msg.encoder1.velocity = vel_1
                 msg.encoder0.target_velocity = self.tar_vel_0
                 msg.encoder1.target_velocity = self.tar_vel_1
+                msg.encoder0.targeted_velocity = targeted_vel_0
+                msg.encoder1.targeted_velocity = targeted_vel_1
                 msg.encoder0.diff_velocity = vel_diff_0
                 msg.encoder1.diff_velocity = vel_diff_1
                 msg.dt = (self.get_clock().now() - start_time).nanoseconds / 1000000.0
@@ -219,6 +242,7 @@ def main(args=None):
             manager_node.destroy_node()
             controller_node.destroy_node()
     finally:
+        manager_node.reboot_odrive()
         rclpy.shutdown()
 
 if __name__ == '__main__':
